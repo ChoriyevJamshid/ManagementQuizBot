@@ -29,7 +29,7 @@ class Command(BaseCommand):
                 if not text:
                     Text.objects.create(code=text_code, language=language, text=value)
                 else:
-                    if text.text != value:
+                    if clean_from_html(text.text) != value:
                         text.text = value
                         text.save(update_fields=['text'])
 

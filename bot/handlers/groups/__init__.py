@@ -3,7 +3,8 @@ from aiogram.filters import CommandStart, Command, or_f
 
 from bot.filters import ChatTypeFilter
 from bot.handlers.groups.main import *
-
+from bot.handlers.groups.testing import *
+from bot.handlers.groups.handle import *
 
 def prepare_router() -> Router:
 
@@ -17,10 +18,19 @@ def prepare_router() -> Router:
     )
 
     router.callback_query.register(
+        send_excel_to_user_callback,
+        F.data.startswith("testing-group-get-excel")
+    )
+
+    router.callback_query.register(
         get_ready_callback_handler,
         F.data.startswith('group-ready')
     )
-    router.callback_query.register(testing_continue_callback_handler, F.data.startswith('testing-group-continue-quiz'))
+
+    router.callback_query.register(
+        testing_continue_callback_handler,
+        F.data.startswith('testing-group-continue-quiz')
+    )
 
     router.poll_answer.register(testing_group_poll_answer_handler)
     return router

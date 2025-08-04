@@ -7,3 +7,10 @@ class QuizStatus(models.TextChoices):
     FINISHED = "finished", "finished"
     CANCELED = "canceled", "canceled"
     PAUSED = "paused", "paused"
+
+
+class QuizPrivacy(models.TextChoices):
+    PUBLIC = 'PUBLIC', 'PUBLIC'
+    PRIVATE = 'PRIVATE', 'PRIVATE'
+
+

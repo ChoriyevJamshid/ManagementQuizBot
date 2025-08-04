@@ -10,6 +10,34 @@ from django.conf import settings
 from aiogram import types
 
 
+def get_text_sync(code: str, language: str, parameters: Optional[Dict[str, str]] = None) -> str:
+    file_path = f"{settings.BASE_DIR}/languages/{language}.json"
+
+    with open(file_path, mode='rb') as file:
+        content = file.read()
+
+    data = orjson.loads(content)
+    text = data.get(code, '')
+
+    print(f"\n{parameters = }\n")
+    print(f"{text = }\n")
+    if parameters and text is not None:
+        for key, value in parameters.items():
+            text = text.replace(f"__{key}", value)
+
+    return text.strip()
+
+
+def get_texts_sync(codes: tuple | list, language: str) -> dict:
+    file_path = f"{settings.BASE_DIR}/languages/{language}.json"
+
+    with open(file_path, mode='rb') as file:
+        content = file.read()
+
+    data = orjson.loads(content)
+    return {code: data.get(code, '').strip() for code in codes}
+
+
 async def get_text(code: str, language: str, parameters: Optional[Dict[str, str]] = None) -> str:
     file_path = f"{settings.BASE_DIR}/languages/{language}.json"
 
@@ -107,7 +135,7 @@ async def get_data_from_txt(file_path: str, only_count=False):
     with open(file_path, "r", encoding="utf-8") as f:
         for index, row in enumerate(f.readlines(), start=1):
             text = row.strip()
-            print(text)
+
             if text == '':
                 continue
 
@@ -129,7 +157,6 @@ async def get_data_from_txt(file_path: str, only_count=False):
                     count += 1
                 current_question = {"options": []}
 
-                print(f"{count = }")
     if only_count:
         return count
     return data
@@ -190,7 +217,7 @@ async def generate_user_quiz_data(part):
     return data
 
 
-async def reform_spent_time(spent_time: float | int):
+def reform_spent_time(spent_time: float | int):
     """
     spent_time: float | int - this argument get time on types: int, float
     """
@@ -203,5 +230,68 @@ async def reform_spent_time(spent_time: float | int):
         formatted_text += f"{minutes} min "
     formatted_text += f"{seconds} sec"
     return formatted_text
+
+
+def create_excel_statistics(
+        file_path: str,
+        sorted_players: list | tuple,
+        quantity: int,
+        language: str = "en",
+):
+    cols_name = {
+        'name': {
+            'en': "Full Name",
+            'uz': "FIO",
+            'ru': "ФИО"
+        },
+        'corrects': {
+            'en': "Corrects",
+            'uz': "To‘g‘ri javoblar",
+            'ru': "Правильные ответы"
+        },
+        'wrongs': {
+            'en': "Wrongs",
+            'uz': "Noto‘g‘ri javoblar",
+            'ru': "Неправильные ответы"
+        },
+        'spent_time': {
+            'en': "Spend Time",
+            'uz': "Sarf qilingan vaqt",
+            'ru': "Затраченное время"
+        },
+        'percent': {
+            'en': "Percent",
+            'uz': "Foiz",
+            'ru': "Процент"
+        }
+
+    }
+    excel_data = []
+    print(f"\n{sorted_players = }\n")
+    for _, player_data in sorted_players:
+
+        if player_data.get('spent_time', 0) == 0:
+            continue
+
+        percent = round(player_data.get('corrects', 0) / quantity * 100, 2)
+        formatted_time = reform_spent_time(player_data.get('spent_time'))
+
+        excel_data.append({
+            cols_name["name"][language]: player_data.get('username'),
+            cols_name["corrects"][language]: player_data.get('corrects'),
+            cols_name["wrongs"][language]: player_data.get('wrongs'),
+            cols_name["spent_time"][language]: formatted_time,
+            cols_name["percent"][language]: f"{percent}%",
+        })
+
+    columns = []
+    for col_name in cols_name.values():
+        columns.append(col_name[language])
+
+    df = pd.DataFrame(
+        excel_data,
+        columns=columns,
+    )
+    df.to_excel(file_path, index=False)
 
 

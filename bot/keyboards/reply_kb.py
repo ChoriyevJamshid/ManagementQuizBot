@@ -39,6 +39,8 @@ async def quiz_category_markup(language: str, state: FSMContext):
 async def quiz_timers_markup(language: str, without_back: bool = False):
     texts = await get_texts(('second', 'minute', 'back_text'), language)
     timers = [
+        f"10 {texts['second']}",
+        f"15 {texts['second']}",
         f"20 {texts['second']}",
         f"25 {texts['second']}",
         f"30 {texts['second']}",
@@ -48,7 +50,6 @@ async def quiz_timers_markup(language: str, without_back: bool = False):
         f"1 {texts['minute']} 30 {texts['second']}",
         f"1 {texts['minute']} 45 {texts['second']}",
         f"2 {texts['minute']}",
-
     ]
     if not without_back:
         timers.append(texts['back_text'])
@@ -56,7 +57,7 @@ async def quiz_timers_markup(language: str, without_back: bool = False):
     builder = ReplyKeyboardBuilder()
     for timer in timers:
         builder.add(KeyboardButton(text=timer))
-    return builder.adjust(*(2, 2, 2, 1, 1)).as_markup(resize_keyboard=True)
+    return builder.adjust(*(3, 3, 2, 2, 1,)).as_markup(resize_keyboard=True)
 
 
 async def quiz_save_markup(language: str):
@@ -81,6 +82,14 @@ async def back_to_pending_messaged_markup():
         one_time_keyboard=True
     )
 
+
+async def share_contact_markup(text: str):
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=text, request_contact=True)]
+        ],
+        resize_keyboard=True,
+    )
 
 async def remove_kb():
     return ReplyKeyboardRemove()

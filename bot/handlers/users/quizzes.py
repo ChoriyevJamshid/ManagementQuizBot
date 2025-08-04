@@ -106,6 +106,7 @@ async def quiz_list_edit_timer_handler(callback: types.CallbackQuery, state: FSM
 
     text = await get_text('edit_quiz_timer', language)
     markup = await reply_kb.quiz_timers_markup(language, without_back=True)
+
     await state.update_data(update_quiz_id=quiz_id)
     await callback.message.delete_reply_markup()
     await callback.message.answer(text, reply_markup=markup)
@@ -120,12 +121,16 @@ async def quiz_list_timer_edit_success_handler(message: types.Message, state: FS
 
     texts = await get_texts(('second', 'minute', 'back_text'), language)
     timers = (
+        f"10 {texts['second']}",
+        f"15 {texts['second']}",
         f"20 {texts['second']}",
         f"25 {texts['second']}",
         f"30 {texts['second']}",
         f"45 {texts['second']}",
         f"1 {texts['minute']}",
+        f"1 {texts['minute']} 15 {texts['second']}",
         f"1 {texts['minute']} 30 {texts['second']}",
+        f"1 {texts['minute']} 45 {texts['second']}",
         f"2 {texts['minute']}",
         '/cancelTimer'
     )

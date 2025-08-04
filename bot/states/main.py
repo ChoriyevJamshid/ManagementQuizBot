@@ -6,6 +6,7 @@ class MainState(StatesGroup):
     choose_language = State()
     instruction = State()
     categories = State()
+    share_contact = State()
 
     admin = State()
     admin_write = State()

@@ -6,12 +6,11 @@ from aiogram.client.bot import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 from aiogram.fsm.storage.base import DefaultKeyBuilder
-from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.storage.redis import RedisStorage
 from redis.asyncio.client import Redis
 
 from src.settings import API_TOKEN, REDIS_HOST, REDIS_PORT
-from bot import handlers
+from bot import handlers, middlewares
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -26,6 +25,7 @@ def setup_handlers(dp: Dispatcher) -> None:
 
 
 def setup_middlewares(dp: Dispatcher) -> None:
+    # dp.update.middleware(middlewares.LoggingMiddleware())
     pass
 
 class Webhook:

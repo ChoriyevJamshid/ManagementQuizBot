@@ -23,7 +23,7 @@ class DataAdmin(SingletonModelAdmin):
 
 @admin.register(TelegramProfile)
 class TelegramProfileAdmin(ImportExportModelAdmin):
-    list_display = ('id', 'chat_id', 'username', 'first_name', 'language', 'role', 'created_at',)
+    list_display = ('id', 'chat_id', 'username', 'first_name', 'phone_number', 'language', 'role', 'created_at',)
     list_display_links = ('chat_id', 'username',)
     list_editable = ('role',)
     list_filter = ('role',)

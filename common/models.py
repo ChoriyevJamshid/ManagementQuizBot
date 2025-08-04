@@ -12,6 +12,7 @@ from solo.models import SingletonModel
 
 
 class TelegramProfile(Profile):
+    is_registered = models.BooleanField(default=False)
     objects = models.Manager()
 
     class Meta:

@@ -35,6 +35,10 @@ async def get_data_solo():
     return com_models.Data.get_solo()
 
 
+async def check_user_exists(chat: types.User):
+    return com_models.TelegramProfile.objects.filter(chat_id=chat.id).exists()
+
+
 async def get_user(chat: types.Chat | types.User, message=None, callback=None):
     user = com_models.TelegramProfile.objects.filter(chat_id=chat.id).first()
     if not user:
@@ -62,9 +66,9 @@ async def get_category_by_iterator(iterator: int):
         return None
 
 async def get_category_by_params(_id: int | str, title: str):
-    return quiz_models.Category.objects.filter(id=_id, title=title).values_list(
+    return await quiz_models.Category.objects.filter(id=_id, title=title).values_list(
         'id', flat=True
-    ).first()
+    ).afirst()
 
 
 async def create_pending_category(title: str):
@@ -97,13 +101,13 @@ async def get_quiz_parts(quiz_id: int):
 
 
 async def get_quiz_part(link: str):
-    return quiz_models.QuizPart.objects.filter(link=link).select_related("quiz", "quiz__owner").first()
+    return await quiz_models.QuizPart.objects.filter(link=link).select_related("quiz", "quiz__owner").afirst()
 
 
 async def get_exists_user_active_quiz(user_id: int):
-    user_quiz = quiz_models.UserQuiz.objects.filter(
+    user_quiz = await quiz_models.UserQuiz.objects.filter(
         user_id=user_id, active=True
-    ).select_related('part', 'part__quiz').first()
+    ).select_related('part', 'part__quiz').afirst()
 
     if not user_quiz:
         return None
@@ -111,24 +115,24 @@ async def get_exists_user_active_quiz(user_id: int):
 
 
 async def get_quiz_part_by_id(part_id: int):
-    return quiz_models.QuizPart.objects.filter(
+    return await quiz_models.QuizPart.objects.filter(
         id=part_id
     ).prefetch_related(
         "questions", "questions__options"
-    ).select_related("quiz", "quiz__owner").first()
+    ).select_related("quiz", "quiz__owner").afirst()
 
 
 async def create_user_quiz(part_id: int, user_id: int):
-    return quiz_models.UserQuiz.objects.create(
+    return await quiz_models.UserQuiz.objects.acreate(
         part_id=part_id,
         user_id=user_id,
     )
 
 
 async def get_user_active_quiz(user_id: int):
-    return quiz_models.UserQuiz.objects.filter(
+    return await quiz_models.UserQuiz.objects.filter(
         user_id=user_id, active=True
-    ).select_related("part", "user", "part__quiz").first()
+    ).select_related("part", "user", "part__quiz").afirst()
 
 
 async def get_user_quizzes_count(part_id: int):
@@ -136,7 +140,7 @@ async def get_user_quizzes_count(part_id: int):
 
 
 async def create_support_message(owner_id: int, question: str):
-    support_models.SupportMessage.objects.create(
+    await support_models.SupportMessage.objects.acreate(
         owner_id=owner_id,
         question=question
     )
@@ -181,6 +185,12 @@ async def get_group_quiz_by_poll_id(poll_id: str) -> quiz_models.GroupQuiz | Non
     ).prefetch_related(
         "part__questions", "part__questions__options"
     ).select_related('part', 'part__quiz', 'user').afirst()
+
+
+async def get_group_quiz_for_excel(group_id: int | str) -> quiz_models.GroupQuiz | None:
+    return await quiz_models.GroupQuiz.objects.filter(id=group_id).select_related(
+        'part', 'part__quiz', 'user'
+    ).afirst()
 
 
 async def create_group_quiz(

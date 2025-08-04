@@ -22,9 +22,6 @@ class CancelFilter(Filter):
 
         current_state = await state.get_state()
         data = await state.get_data()
-        # if current_state == states.MainState.main_menu:
-        #     await message.delete()
-        #     return False
 
         if current_state == states.QuizState.testing:
             user = await utils.get_user(message.chat)

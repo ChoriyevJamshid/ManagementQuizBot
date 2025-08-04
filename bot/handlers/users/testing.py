@@ -13,6 +13,7 @@ from bot.utils.functions import (
     generate_user_quiz_data,
     testing_animation
 )
+from bot.handlers.groups.common import check_quiz_part_owner
 
 
 async def testing_stop_quiz_handler(message: types.Message, state: FSMContext):
@@ -26,8 +27,8 @@ async def testing_stop_quiz_handler(message: types.Message, state: FSMContext):
     if not user_quiz:
         text = await get_text("testing_not_active_quiz", language)
         await message.answer(text)
-        await state.clear()
-        return
+        return await state.clear()
+
 
     current_user_quiz = data.get("current_user_quiz", {})
     times = current_user_quiz.get('times', 0)
@@ -49,7 +50,7 @@ async def testing_stop_quiz_handler(message: types.Message, state: FSMContext):
 
     await message.answer(text=text, reply_markup=markup)
     await state.set_state(QuizState.finished)
-    await save_user_quiz(user.id, current_user_quiz, QuizStatus.CANCELED)
+    return await save_user_quiz(user.id, current_user_quiz, QuizStatus.CANCELED)
 
 
 async def testing_link_handler(message: types.Message, state: FSMContext):
@@ -62,8 +63,8 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
         text = await get_text("testing_quiz_active_not_stopped", language, {
             "title": title
         })
-        await message.answer(text)
-        return
+        return await message.answer(text)
+
 
     link = message.text.split('_')[-1]
     if len(message.text.split(' ')) == 2:
@@ -83,8 +84,20 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
         text = await get_text('testing_quiz_part_not_found', language)
         return await message.answer(text)
 
-    players_count = await utils.get_user_quizzes_count(quiz_part.id)
+    is_owner = await check_quiz_part_owner(
+        quiz_part=quiz_part,
+        user=user,
+        message=message,
+        language=quiz_part.quiz.owner.language or "en"
+    )
 
+    if not is_owner:
+        return None
+
+
+
+
+    players_count = await utils.get_user_quizzes_count(quiz_part.id)
     if players_count == 0:
         text = await get_text(
             'testing_quiz_part_info_not_answered', language,
@@ -115,7 +128,7 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
         link=quiz_part.link
     )
     await message.answer(text, reply_markup=markup)
-    await state.set_state(QuizState.quizzes)
+    return await state.set_state(QuizState.quizzes)
 
 
 async def testing_start_pressed_handler(callback: types.CallbackQuery, state: FSMContext):

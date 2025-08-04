@@ -453,10 +453,20 @@ async def test_group_continue_markup(group_id: str, index: int, language: str, )
     )
 
 
-async def test_group_share_quiz(link: str):
-    text = await get_text('share_quiz_button', 'en')
+async def test_group_share_quiz(texts: dict, link: str, group_quiz_id: int = 0, language: str = 'en'):
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=text, switch_inline_query=f"share-quiz_{link}")]
+            [
+                InlineKeyboardButton(
+                    text=texts['get_excel_button'],
+                    callback_data=f"testing-group-get-excel_{group_quiz_id}_{language}"
+                )
+            ],
+            [
+                InlineKeyboardButton(
+                    text=texts['share_quiz_button'],
+                    switch_inline_query=f"share-quiz_{link}"
+                )
+            ]
         ]
     )

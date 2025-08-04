@@ -11,12 +11,16 @@ from bot.handlers.users.testing import *
 from bot.handlers.users.inline_mode import *
 from bot.handlers.users.categories import *
 from bot.handlers.users.support import *
+from bot.handlers.users import acception
 
 
 def prepare_router() -> Router:
     router = Router()
     router.message.filter(F.chat.type == "private")
     router.callback_query.filter(F.message.chat.type == "private")
+
+    router.message.filter(RegisteredFilter())
+    router.callback_query.filter(RegisteredFilter())
 
     # message handlers
     router.message.register(cancel_handler, Command('cancel'))
@@ -68,7 +72,14 @@ def prepare_router() -> Router:
         F.data == 'support-testing-questions-file'
     )
 
-
+    # acception.py
+    """
+        Handlers from acception.py    
+    """
+    router.callback_query.register(
+        acception.add_user_to_quiz_allowed_callback,
+        F.data.startswith('accept-user-to-use-quiz')
+    )
 
     # main.py
     """
@@ -112,6 +123,11 @@ def prepare_router() -> Router:
     router.message.register(
         create_quiz_save_handler,
         CreateQuizState.save,
+    )
+
+    router.message.register(
+        get_user_contact_handler,
+        MainState.share_contact
     )
 
     # quizzes.py

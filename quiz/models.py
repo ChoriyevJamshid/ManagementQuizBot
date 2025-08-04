@@ -35,14 +35,25 @@ class Quiz(BaseModel):
         null=True,
         related_name="quizzes"
     )
+    allowed_users = models.JSONField(
+        default=list,
+        blank=True,
+        null=True
+    )
 
     title = models.CharField(max_length=127)
     file_id = models.CharField(max_length=255)
+
     quantity = models.PositiveIntegerField()
     timer = models.PositiveSmallIntegerField()
     privacy = models.BooleanField(default=False)
 
     objects = models.Manager()
+
+    def save(self, *args, **kwargs):
+        if not self.allowed_users:
+            self.allowed_users = []
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title
@@ -54,6 +65,12 @@ class QuizPart(BaseModel):
         on_delete=models.CASCADE,
         related_name="parts"
     )
+    title = models.CharField(
+        max_length=255,
+        blank=True,
+        null=True
+    )
+
     link = models.CharField(
         max_length=31,
         unique=True
@@ -120,7 +137,6 @@ class UserQuiz(BaseModel):
         return f"UserQuiz -> {self.pk}"
 
 
-
 class GroupQuiz(BaseModel):
     part = models.ForeignKey(QuizPart, on_delete=models.CASCADE, related_name="group_quizzes")
     user = models.ForeignKey("common.TelegramProfile", on_delete=models.CASCADE, related_name="group_quizzes")
@@ -139,6 +155,7 @@ class GroupQuiz(BaseModel):
     answers = models.PositiveSmallIntegerField(default=0)
     participant_count = models.PositiveSmallIntegerField(default=0)
 
+    file = models.FileField(upload_to="quiz/%Y/%m/%d", blank=True, null=True)
     status = models.CharField(max_length=31, choices=QuizStatus.choices, default=QuizStatus.INIT)
     data = models.JSONField(blank=True, null=True)
 
@@ -157,11 +174,9 @@ class TelegramCommand(BaseModel):
     objects = models.Manager()
 
     class Meta:
-        ordering = ('order', )
+        ordering = ('order',)
         verbose_name = "Command"
         verbose_name_plural = 'Commands'
 
     def __str__(self):
         return self.command
-
-

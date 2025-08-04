@@ -13,7 +13,6 @@ from bot.handlers.users.support import support_handler
 
 
 async def start_handler(message: types.Message, state: FSMContext):
-    data = await state.get_data()
     user = await utils.get_user(message.from_user)
     if not user.language:
         markup = await inline_kb.languages_markup()
@@ -59,10 +58,23 @@ async def choose_language_handler(callback: types.CallbackQuery, state: FSMConte
     user.language = language
     user.save(update_fields=['language'])
 
-    markup = await inline_kb.main_menu_markup(user.language)
-    text = await get_text('main_menu', language)
-    await callback.message.edit_text(text, reply_markup=markup)
-    await state.set_state(states.MainState.main_menu)
+    if user.is_registered:
+        markup = await inline_kb.main_menu_markup(user.language)
+        text = await get_text('main_menu', language)
+        await callback.message.edit_text(text, reply_markup=markup)
+        await state.set_state(states.MainState.main_menu)
+        return await state.update_data(markup_message_id=callback.message.message_id)
+
+    texts = await get_texts(
+        ('user_share_contact_for_register_text', 'share_contact_text'), language
+    )
+    await callback.message.delete_reply_markup()
+    await callback.message.answer(
+        text=texts['user_share_contact_for_register_text'],
+        reply_markup=await reply_kb.share_contact_markup(text=texts['share_contact_text'])
+    )
+    await state.set_state(states.MainState.share_contact)
+    return await callback.answer()
 
 
 async def main_menu_handler(callback: types.CallbackQuery, state: FSMContext):
@@ -92,6 +104,28 @@ async def change_language_handler(callback: types.CallbackQuery, state: FSMConte
     await state.set_state(states.MainState.choose_language)
 
 
+async def get_user_contact_handler(message: types.Message, state: FSMContext):
+
+    user = await utils.get_user(message.from_user)
+    language = user.language or "en"
+    if message.content_type != types.ContentType.CONTACT:
+
+        text = await get_text('please_send_contact_for_register', language)
+        return await message.reply(text)
+
+    user.phone_number = str(message.contact.phone_number)
+    user.is_registered = True
+    markup = await inline_kb.main_menu_markup(user.language)
+    texts = await get_texts(('main_menu', 'registered_success_text'), language)
+
+    await message.answer(texts['registered_success_text'], reply_markup=await reply_kb.remove_kb())
+    await message.answer(texts['main_menu'], reply_markup=markup)
+
+    await state.set_state(states.MainState.main_menu)
+    await state.update_data(markup_message_id=message.message_id + 2)
+    return await user.asave(update_fields=['phone_number', 'is_registered', 'updated_at'])
+
+
 async def delete_message_handler(message: types.Message, state: FSMContext):
     try:
         await message.delete()
@@ -105,7 +139,6 @@ async def delete_callback_handler(callback: types.CallbackQuery, state: FSMConte
     language = user.language if user.language else 'en'
     text = await get_text('please_press_start', language)
     try:
-
         await callback.message.delete()
     except Exception as e:
         pass

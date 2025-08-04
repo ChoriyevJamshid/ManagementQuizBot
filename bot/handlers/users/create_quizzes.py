@@ -36,6 +36,10 @@ async def create_quiz_get_title_handler(message: types.Message, state: FSMContex
     user = await utils.get_user(message.from_user)
     language = user.language if user.language else 'en'
 
+    if message.content_type != types.ContentType.TEXT:
+        text = await get_text('create_quiz_title', language)
+        return await message.answer(text)
+
     if message.text.startswith("/"):
         text = await get_text('create_quiz_not_allowed_title', language)
         await message.answer(text)
@@ -45,13 +49,17 @@ async def create_quiz_get_title_handler(message: types.Message, state: FSMContex
     markup = await reply_kb.quiz_category_markup(language, state)
     await state.update_data(quiz_title=message.text)
     await message.answer(text, reply_markup=markup)
-    await state.set_state(states.CreateQuizState.category)
+    return await state.set_state(states.CreateQuizState.category)
 
 
 async def create_quiz_get_category_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     user = await utils.get_user(message.from_user)
     language = user.language if user.language else 'en'
+
+    if message.content_type != types.ContentType.TEXT:
+        text = await get_text('create_quiz_category', language)
+        return await message.answer(text)
 
     if message.text.startswith('🔙'):
         text = await get_text('create_quiz_title', language)
@@ -92,12 +100,13 @@ async def create_quiz_get_category_handler(message: types.Message, state: FSMCon
     markup = await reply_kb.back_markup(language)
 
     await message.answer(text, reply_markup=markup)
-    await state.set_state(states.CreateQuizState.file)
+    return await state.set_state(states.CreateQuizState.file)
 
 
 async def create_quiz_get_file_handler(message: types.Message, state: FSMContext):
     user = await utils.get_user(message.from_user)
     language = user.language if user.language else 'en'
+
 
     if message.text:
         if message.text.startswith('🔙'):
@@ -110,14 +119,14 @@ async def create_quiz_get_file_handler(message: types.Message, state: FSMContext
     if not message.document:
         text = await get_text('create_quiz_file_not_document', language)
         markup = await reply_kb.back_markup(language)
-        await message.answer(text, reply_markup=markup)
-        return
+        return await message.answer(text, reply_markup=markup)
+
 
     if message.document.file_name.split('.')[-1] not in ('docx', 'xlsx', 'txt'):
         text = await get_text('create_quiz_file_not_correct_extension', language)
         markup = await reply_kb.back_markup(language)
-        await message.answer(text, reply_markup=markup)
-        return
+        return await message.answer(text, reply_markup=markup)
+
 
     question_data = []
     file_name, file_formate = await download_file(message.bot, message.document.file_id)
@@ -143,7 +152,7 @@ async def create_quiz_get_file_handler(message: types.Message, state: FSMContext
         quiz_question_data=question_data,
         quiz_quantity=len(question_data),
     )
-    await state.set_state(states.CreateQuizState.timer)
+    return await state.set_state(states.CreateQuizState.timer)
 
 
 async def create_quiz_get_timer_handler(message: types.Message, state: FSMContext):
@@ -151,15 +160,21 @@ async def create_quiz_get_timer_handler(message: types.Message, state: FSMContex
     user = await utils.get_user(message.from_user)
     language = user.language if user.language else 'en'
 
-    if message.text and message.text.startswith('🔙'):
+    if message.content_type != types.ContentType.TEXT:
+        text = await get_text('create_quiz_timer', language)
+        return await message.answer(text)
+
+    if message.text.startswith('🔙'):
         text = await get_text('create_quiz_file', language)
         markup = await reply_kb.back_markup(language)
         await message.answer(text, reply_markup=markup)
-        await state.set_state(states.CreateQuizState.file)
-        return
+        return await state.set_state(states.CreateQuizState.file)
+
 
     texts = await get_texts(('second', 'minute', 'back_text'), language)
     timers = (
+        f"10 {texts['second']}",
+        f"15 {texts['second']}",
         f"20 {texts['second']}",
         f"25 {texts['second']}",
         f"30 {texts['second']}",
@@ -168,13 +183,13 @@ async def create_quiz_get_timer_handler(message: types.Message, state: FSMContex
         f"1 {texts['minute']} 15 {texts['second']}",
         f"1 {texts['minute']} 30 {texts['second']}",
         f"1 {texts['minute']} 45 {texts['second']}",
-        f"2 {texts['minute']}"
+        f"2 {texts['minute']}",
     )
 
     if message.text not in timers:
         text = await get_text('create_quiz_timer_not_allowed_timer', language)
-        await message.answer(text)
-        return
+        return await message.answer(text)
+
 
     __ = message.text.split(' ')
     timer = 0
@@ -195,13 +210,18 @@ async def create_quiz_get_timer_handler(message: types.Message, state: FSMContex
     markup = await reply_kb.quiz_save_markup(language)
     await state.update_data(quiz_timer=timer)
     await message.answer(text, reply_markup=markup)
-    await state.set_state(states.CreateQuizState.save)
+    return await state.set_state(states.CreateQuizState.save)
 
 
 async def create_quiz_save_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     user = await utils.get_user(message.from_user)
     language = user.language if user.language else 'en'
+
+    if message.content_type != types.ContentType.TEXT:
+        markup = await reply_kb.quiz_save_markup(language)
+        text = await get_text('use_below_buttons_text', language)
+        return await message.answer(text, reply_markup=markup)
 
     if message.text and message.text.startswith('🔙'):
         text = await get_text('create_quiz_timer', language)
@@ -215,11 +235,9 @@ async def create_quiz_save_handler(message: types.Message, state: FSMContext):
     text = await get_text('create_quiz_success', language)
     markup = await reply_kb.remove_kb()
 
-    print(f"{text = }")
-
     await message.answer(text, reply_markup=markup)
     await state.clear()
-    await create_quiz(message, data, user)
+    return await create_quiz(message, data, user)
 
 
 async def download_file(bot, file_id: str):
@@ -241,24 +259,17 @@ async def create_quiz(message: types.Message, data: dict, user: TelegramProfile)
     """
     Not handler
     """
-    print("Worked create quiz")
 
     title = data.get('quiz_title', '')
-    print(f"Title: {title}")
     timer = data.get('quiz_timer', 0)
-    print(f"Timer: {timer}")
     iterator = data.get('iterator', None)
-    print(f"Iterator: {iterator}")
     file_id = data.get('quiz_file_id', '')
-    print(f"File ID: {file_id}")
     question_data = data.get('quiz_question_data', [])
 
     by_ques = 25
     total_ques = len(question_data)
     total_parts = total_ques // by_ques if not total_ques % by_ques else total_ques // by_ques + 1
-    print(f"Total parts: {total_parts}")
     category = await utils.get_category_by_iterator(iterator)
-    print(f"{category = }")
 
     new_quiz = quiz_models.Quiz.objects.create(
         owner_id=user.id,
@@ -269,7 +280,6 @@ async def create_quiz(message: types.Message, data: dict, user: TelegramProfile)
         quantity=total_ques,
 
     )
-    print(f"{new_quiz = }")
 
     for i in range(total_parts):
         while True:
@@ -281,12 +291,14 @@ async def create_quiz(message: types.Message, data: dict, user: TelegramProfile)
         to_i = (i + 1) * by_ques if (i + 1) * by_ques <= total_ques else total_ques
         quantity = to_i - from_i + 1
 
+        part_title = f"№0{i + 1}" if (i + 1) < 10 else f"№{i + 1}"
         new_part = quiz_models.QuizPart.objects.create(
             quiz_id=new_quiz.id,
             link=link,
             from_i=from_i,
             to_i=to_i,
             quantity=quantity,
+            title=f"{title[:127]} {part_title}"
         )
 
         for j in range(quantity):
