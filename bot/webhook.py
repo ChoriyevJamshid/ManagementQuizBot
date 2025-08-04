@@ -26,6 +26,7 @@ def setup_handlers(dp: Dispatcher) -> None:
 
 def setup_middlewares(dp: Dispatcher) -> None:
     # dp.update.middleware(middlewares.LoggingMiddleware())
+    dp.update.middleware(middleware=middlewares.CheckingMiddleware())
     pass
 
 class Webhook:
