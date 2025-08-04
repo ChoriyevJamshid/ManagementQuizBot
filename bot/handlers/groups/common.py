@@ -2,6 +2,7 @@ import asyncio
 from aiogram import types
 from bot.utils.functions import get_texts, get_text
 from quiz.tasks import send_notify_to_quiz_owner
+from utils import Role
 
 
 async def delete_quiz_reply_markup(group_id: str, message_id: str, callback: types.CallbackQuery):
@@ -66,6 +67,7 @@ async def check_quiz_part_owner(
             quiz_part.quiz.privacy is True
             and user.chat_id != quiz_part.quiz.owner.chat_id
             and user.chat_id not in quiz_part.quiz.allowed_users
+            and user.role != Role.ADMIN
     ):
         if user.phone_number:
             user_cred = user.phone_number
