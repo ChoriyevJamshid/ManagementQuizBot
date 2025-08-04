@@ -22,6 +22,9 @@ class CheckingMiddleware(BaseMiddleware):
         else:
             tg_user = event.callback_query.from_user
 
+        if tg_user.is_bot:
+            return await handler(event, data)
+
         user = await utils.get_user(tg_user)
         if user.role == Role.ADMIN:
             return await handler(event, data)
