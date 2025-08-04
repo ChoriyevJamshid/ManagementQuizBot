@@ -46,7 +46,7 @@ class Quiz(BaseModel):
 
     quantity = models.PositiveIntegerField()
     timer = models.PositiveSmallIntegerField()
-    privacy = models.BooleanField(default=False)
+    privacy = models.BooleanField(default=True)
 
     objects = models.Manager()
 
