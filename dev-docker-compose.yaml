@@ -1,0 +1,105 @@
+
+services:
+
+  postgres:
+    image: postgres:16
+    container_name: dev_fqb_postgres
+    env_file:
+      - .env
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_HOST=${DB_HOST}
+      - POSTGRES_DB=${DB_NAME}
+      - POSTGRES_PORT=${DB_PORT}
+    restart: always
+
+  redis:
+    image: redis:7
+    container_name: dev_fqb_redis
+    restart: always
+
+  django:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dev_fqb_django
+    restart: always
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      - ./:/app
+      - ./static:/app/static
+      - ./media:/app/media
+      - ./locale:/app/locale
+      - ./logs:/app/logs
+      - ./languages:/app/languages
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Tashkent
+      - WITH_BOT=true
+    ports:
+      - "${WEB_PORT}:${WEB_PORT}"
+    depends_on:
+      - postgres
+      - redis
+
+  bot:
+    profiles: ["with-bot"]
+    environment:
+      - WITH_BOT=true
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dev_fqb_bot
+    command: /bin/bash -c "python manage.py deletewebhook && python manage.py runbot"
+    entrypoint: []
+    volumes:
+      - ./logs:/app/logs
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+      - django
+
+  celery:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    container_name: dev_fqb_celery
+    restart: always
+    command: celery -A src worker --concurrency=2 --loglevel=INFO
+    entrypoint: []
+    volumes:
+      - .:/app
+    env_file:
+      - ./.env
+    depends_on:
+      - redis
+      - postgres
+
+  celery_beat:
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    container_name: dev_fqb_beat
+    restart: always
+    command: celery -A src beat -l INFO
+    entrypoint: [ ]
+    volumes:
+      - ./:/app
+    env_file:
+      - ./.env
+    depends_on:
+      - redis
+      - postgres
+
+volumes:
+  postgres_data:
+  logs:
+
+
+
