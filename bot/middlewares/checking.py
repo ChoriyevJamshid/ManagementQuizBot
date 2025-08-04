@@ -17,8 +17,12 @@ class CheckingMiddleware(BaseMiddleware):
 
         if not event.message and not event.callback_query:
             return await handler(event, data)
+        if event.message:
+            tg_user = event.message.from_user
+        else:
+            tg_user = event.callback_query.from_user
 
-        user = await utils.get_user(event)
+        user = await utils.get_user(tg_user)
         if user.role == Role.ADMIN:
             return await handler(event, data)
 
