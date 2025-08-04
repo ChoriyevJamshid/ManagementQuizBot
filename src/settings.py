@@ -202,19 +202,19 @@ INTERNAL_IPS = ["127.0.0.1"]
 
 JAZZMIN_SETTINGS = {
     # title of the window (Will default to current_admin_site.site_title if absent or None)
-    "site_title": "FileQuiz Bot",
+    "site_title": "Manager Quiz | Bot",
 
     # Title on the login screen (19 chars max) (defaults to current_admin_site.site_header if absent or None)
-    "site_header": "FileQuiz Bot",
+    "site_header": "Manager Quiz | Bot",
 
     # Title on the brand (19 chars max) (defaults to current_admin_site.site_header if absent or None)
-    "site_brand": "FileQuiz Bot",
+    "site_brand": "Manager Quiz | Bot",
 
     # Logo to use for your site, must be present in static files, used for brand on top left
-    "site_logo": "images/quiz-logo.jpg",
+    "site_logo": "images/manager_quiz.jpg",
 
     # Logo to use for your site, must be present in static files, used for login form logo (defaults to site_logo)
-    "login_logo": "images/quiz-logo.jpg",
+    "login_logo": "images/manager_quiz.jpg",
 
     # Logo to use for login form in dark themes (defaults to login_logo)
     "login_logo_dark": None,
@@ -226,7 +226,7 @@ JAZZMIN_SETTINGS = {
     "site_icon": None,
 
     # Welcome text on the login screen
-    "welcome_sign": "Welcome to the FileQuiz Bot Admin Panel",
+    "welcome_sign": "Welcome to the ManagerQuiz Bot Admin Panel",
 
     # Copyright on the footer
     "copyright": "Acme Library Ltd",
