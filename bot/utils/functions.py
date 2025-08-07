@@ -101,7 +101,7 @@ async def get_data_from_document(file_path, only_count=False):
 async def get_data_from_xlsx(file_path: str, only_count=False):
     _data = []
     count = 0
-    df = pd.read_excel(file_path, engine="openpyxl", usecols=[0, 1, 2, 3, 4, 5], header=None)
+    df = pd.read_excel(file_path, engine="openpyxl", header=None)
 
     for _, row in df.iterrows():
         row = row.fillna("")
