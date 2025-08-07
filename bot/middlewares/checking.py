@@ -32,9 +32,10 @@ class CheckingMiddleware(BaseMiddleware):
             return await handler(event, data)
 
         user = await utils.get_user(tg_user)
+        print(f"{user = }")
         if user.role == Role.ADMIN:
             return await handler(event, data)
-
+        print(f"{user.role = }")
         return None
 
 
