@@ -52,10 +52,10 @@ async def send_tests_by_recurse(
         )
 
     question_text = (f"<b>[{index + 1}/{total_questions}]. {question_data[index]['question']}</b>\n\n"
-                     f"<b>A)</b> <i>{question_data[index]['options'][0]}</i>\n"
-                     f"<b>B)</b> <i>{question_data[index]['options'][1]}</i>\n"
-                     f"<b>C)</b> <i>{question_data[index]['options'][2]}</i>\n"
-                     f"<b>D)</b> <i>{question_data[index]['options'][3]}</i>\n")
+                     f"<b>A)</b> {question_data[index]['options'][0]}\n\n"
+                     f"<b>B)</b> {question_data[index]['options'][1]}\n\n"
+                     f"<b>C)</b> {question_data[index]['options'][2]}\n\n"
+                     f"<b>D)</b> {question_data[index]['options'][3]}\n\n")
     correct_option_id = question_data[index]['options'].index(question_data[index]['correct_option'])
 
     await callback.bot.send_message(chat_id=group_quiz.group_id, text=question_text)
