@@ -64,10 +64,7 @@ async def check_quiz_part_owner(
         language: str = "en"
 ):
     if (
-            quiz_part.quiz.privacy is True
-            and user.chat_id != quiz_part.quiz.owner.chat_id
-            and user.chat_id not in quiz_part.quiz.allowed_users
-            and user.role != Role.ADMIN
+            user.role != Role.ADMIN
     ):
         if user.phone_number:
             user_cred = user.phone_number
