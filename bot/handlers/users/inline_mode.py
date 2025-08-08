@@ -43,7 +43,7 @@ async def testing_inline_query(query: types.InlineQuery):
 
     data_solo = await utils.get_data_solo()
 
-    title = quiz_part.quiz.title
+    title = quiz_part.title
     quantity = quiz_part.quantity
     timer = quiz_part.quiz.timer
 
