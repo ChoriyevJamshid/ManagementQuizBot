@@ -68,9 +68,7 @@ async def start_handler(message: types.Message):
 
         print(f"\n{is_owner = }\n")
         if not is_owner:
-            return None
 
-        if is_owner:
             group_cred = message.chat.username or message.chat.title
             user_cred = user.username or user.phone_number or user.first_name
             text = await get_text('testing_group_quiz_is_private', language)

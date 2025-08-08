@@ -63,9 +63,7 @@ async def check_quiz_part_owner(
         message,
         language: str = "en"
 ):
-    if (
-            user.role != Role.ADMIN
-    ):
+    if user.role != Role.ADMIN:
         if user.phone_number:
             user_cred = user.phone_number
         elif user.username:
