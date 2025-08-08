@@ -63,7 +63,10 @@ async def start_handler(message: types.Message):
         print(f"\n{user.chat_id not in quiz_part.quiz.allowed_users = }\n")
         print(f"{quiz_part.quiz.allowed_users = }")
 
+        print(f"\n{user.role = }\n")
         is_owner = await check_quiz_part_owner(quiz_part, user, message, language)
+
+        print(f"\n{is_owner = }\n")
         if not is_owner:
             return None
         if (
