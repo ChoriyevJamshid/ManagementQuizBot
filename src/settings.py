@@ -91,6 +91,7 @@ WSGI_APPLICATION = 'src.wsgi.application'
 
 DB_SQLITE = 'sqlite'
 DB_POSTGRESQL = 'postgresql'
+PGBOUNCER = 'pgbouncer'
 
 DB_ALL = {
     DB_SQLITE: {
@@ -104,8 +105,17 @@ DB_ALL = {
         'PASSWORD': env.str("DB_PASSWORD"),
         'HOST': env.str("DB_HOST"),
         'PORT': env.str("DB_PORT"),
-        'CONN_MAX_AGE': 60,
-    }
+        'CONN_MAX_AGE': 20,
+    },
+    PGBOUNCER: {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': env.str("DB_NAME"),
+            'USER': env.str("DB_USER"),
+            'PASSWORD': env.str("DB_PASSWORD"),
+            'HOST': env.str("PGBOUNCER_HOST"),
+            'PORT': env.str("PGBOUNCER_PORT"),
+            "CONN_MAX_AGE": 0
+        }
 }
 
 DATABASES = {
