@@ -14,6 +14,7 @@ from bot.utils.functions import (
     testing_animation
 )
 from bot.handlers.groups.common import check_quiz_part_owner
+from bot.utils import texts
 
 
 async def testing_stop_quiz_handler(message: types.Message, state: FSMContext):
@@ -87,8 +88,7 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
     is_owner = await check_quiz_part_owner(
         quiz_part=quiz_part,
         user=user,
-        message=message,
-        language=quiz_part.quiz.owner.language or "en"
+        message=message
     )
 
     if not is_owner:

@@ -2,6 +2,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton, InlineKeyboardMarkup
 from bot import utils
 from bot.utils.functions import get_texts, get_text
+from bot.utils import texts
 
 
 async def languages_markup():
@@ -429,8 +430,8 @@ async def admin_pending_message_markup(ids: list):
 # group handlers keyboards
 
 
-async def group_ready_markup(group_id: str, language: str):
-    text = await get_text('testing_ready_button', language)
+async def group_ready_markup(group_id: str):
+    text = texts.testing_ready_button
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -444,22 +445,27 @@ async def group_ready_markup(group_id: str, language: str):
     )
 
 
-async def test_group_continue_markup(group_id: str, index: int, language: str, ):
-    text = await get_text('testing_continue_button', language)
+async def test_group_continue_markup(group_id: str, index: int):
+    text = texts.testing_continue_button
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=text, callback_data=f"testing-group-continue-quiz_{group_id}_{index}")]
+            [
+                InlineKeyboardButton(
+                    text=text,
+                    callback_data=f"testing-group-continue-quiz_{group_id}_{index}"
+                )
+            ]
         ]
     )
 
 
-async def test_group_share_quiz(texts: dict, link: str, group_quiz_id: int = 0, language: str = 'en'):
+async def test_group_share_quiz(texts: dict, link: str, group_quiz_id: int = 0):
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 InlineKeyboardButton(
                     text=texts['get_excel_button'],
-                    callback_data=f"testing-group-get-excel_{group_quiz_id}_{language}"
+                    callback_data=f"testing-group-get-excel_{group_quiz_id}"
                 )
             ],
             [

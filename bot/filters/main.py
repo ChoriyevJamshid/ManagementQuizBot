@@ -53,7 +53,7 @@ class CancelFilter(Filter):
 
 
 class ChatTypeFilter(Filter):
-    def     __init__(self, chat_types: tuple) -> None:
+    def __init__(self, chat_types: tuple | list) -> None:
         super().__init__()
         self.chat_types = chat_types
 

@@ -5,6 +5,7 @@ from quiz.models import GroupQuiz, Quiz
 
 from bot.utils.methods import get_chat, send_text
 from bot.utils.functions import create_excel_statistics, get_texts_sync, get_text_sync
+from bot.utils import texts
 
 
 @shared_task
@@ -70,20 +71,16 @@ def send_notify_to_quiz_owner(
         return None
 
     telegram_id = quiz.owner.chat_id
-    language = quiz.owner.language or 'en'
+    text = texts.send_notify_to_quiz_owner.format(
+        username=user_credential,
+        groupname=group_credential,
+        quizname=quiz.title,
+    )
 
-    text = get_text_sync(
-        code='send_notify_to_quiz_owner',
-        language=language,
-        parameters={
-            'quizname': quiz.title,
-            'username': user_credential,
-            'groupname': group_credential
-        })
-
-    btn_texts = get_texts_sync((
-        'accept_user_button', 'decline_user_button'
-    ), language)
+    btn_texts = {
+        'accept_user_button': texts.accept_user_button,
+        'decline_user_button': texts.decline_user_button,
+    }
     a_text = btn_texts['accept_user_button']
     d_text = btn_texts['decline_user_button']
 

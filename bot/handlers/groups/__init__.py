@@ -12,10 +12,8 @@ def prepare_router() -> Router:
     router.message.filter(ChatTypeFilter(('group', 'supergroup')))
 
     router.message.register(start_handler, CommandStart())
-    router.message.register(
-        stop_handler,
-        or_f(Command('stop'), Command('stopQuiz'),)
-    )
+    router.message.register(stop_handler, Command('stop'))
+    router.message.register(stop_handler, Command('stopQuiz'))
 
     router.callback_query.register(
         send_excel_to_user_callback,

@@ -7,21 +7,23 @@ from quiz.models import GroupQuiz
 
 from bot import utils
 from bot.states import QuizState
-from bot.utils.functions import get_text, generate_user_quiz_data
+from bot.utils.functions import generate_user_quiz_data
+from bot.utils import texts
+
 from .send_test import send_tests_by_recurse
 from .common import animate_texts, delete_quiz_reply_markup
 
 
 async def testing_send_tests_by_recurse(group_quiz: GroupQuiz, callback: types.CallbackQuery, state: FSMContext):
-    language = group_quiz.language or "en"
+
     await delete_quiz_reply_markup(group_quiz.group_id, group_quiz.message_id, callback)
-    message_id = await animate_texts(group_quiz.group_id, callback, language=language)
+    message_id = await animate_texts(group_quiz.group_id, callback)
 
     await callback.bot.delete_message(chat_id=group_quiz.group_id, message_id=message_id)
     await state.set_state(QuizState.group_testing)
 
+    poll_question = texts.poll_question
     question_data = await generate_user_quiz_data(group_quiz.part)
-    poll_question = await get_text('poll_question', language)
 
     return await send_tests_by_recurse(
         group_id=group_quiz.group_id,
@@ -41,9 +43,8 @@ async def testing_continue_callback_handler(callback: types.CallbackQuery, state
     if not group_quiz:
         return await callback.answer()
 
-    language = group_quiz.language or "en"
     question_data = await generate_user_quiz_data(group_quiz.part)
-    poll_question = await get_text('poll_question', language)
+    poll_question = texts.poll_question
 
     await callback.message.delete_reply_markup()
     await callback.answer()

@@ -8,11 +8,8 @@ from quiz.choices import QuizStatus
 from bot import utils
 from bot.keyboards import inline_kb
 
-from bot.utils.functions import (
-    get_text,
-    get_texts,
-    reform_spent_time
-)
+from bot.utils import texts
+from bot.utils.functions import reform_spent_time
 
 from quiz.tasks import group_quiz_create_file
 
@@ -25,11 +22,10 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled=False):
     if not group_quiz:
         return None
 
-    language = group_quiz.language or "en"
     if group_quiz.answers == 0:
-        text = await get_text('group_quiz_finished_noone_took_part', language, {
-            "title": group_quiz.part.quiz.title
-        })
+        text = texts.group_quiz_finished_noone_took_part.format(
+            title=group_quiz.part.quiz.title
+        )
     else:
         users_text = str()
         players = group_quiz.data.get('players', {})
@@ -68,23 +64,25 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled=False):
                 users_text += f"{index}. {username} - {corrects} ({formatted_spent_time})\n"
             index += 1
 
-        text = await get_text('group_quiz_finished', language, {
-            "title": group_quiz.part.title,
-            "count": str(group_quiz.answers),
-            "users": str(users_text),
 
-        })
+        text = texts.group_quiz_finished.format(
+            title=group_quiz.part.title,
+            count=str(group_quiz.answers),
+            users=str(users_text)
+        )
 
-    texts = await get_texts(('share_quiz_button', 'get_excel_button'), language)
+    button_texts = {
+        'get_excel_button': texts.get_excel_button,
+        'share_quiz_button': texts.share_quiz_button
+    }
+
     markup = await inline_kb.test_group_share_quiz(
-        texts=texts,
+        texts=button_texts,
         link=group_quiz.part.link,
         group_quiz_id=group_quiz.pk,
-        language=language
     )
     await bot.send_message(chat_id=group_id, text=text, reply_markup=markup)
 
     group_quiz.status = QuizStatus.CANCELED if is_cancelled else QuizStatus.FINISHED
     group_quiz.participant_count = len(players) if players else 0
     return await group_quiz.asave(update_fields=['participant_count', 'status', 'updated_at'])
-
