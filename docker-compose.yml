@@ -1,4 +1,3 @@
-
 services:
 
   postgres:
@@ -15,6 +14,30 @@ services:
       - POSTGRES_DB=${DB_NAME}
       - POSTGRES_PORT=${DB_PORT}
     restart: always
+
+  pgbouncer:
+    image: edoburu/pgbouncer
+    container_name: blacklistv2_pgbouncer
+    restart: always
+    env_file:
+      - ./.env
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_HOST=${DB_HOST}
+      - POSTGRES_DB=${DB_NAME}
+      - POOL_MODE=${POOL_MODE}
+      - MAX_CLIENT_CONN=${MAX_CLIENT_CONN}
+      - DEFAULT_POOL_SIZE=${DEFAULT_POOL_SIZE}
+      - PGBOUNCER_HOST=${PGBOUNCER_HOST}
+      - LISTEN_PORT=${PGBOUNCER_PORT}
+      - AUTH_TYPE=trust
+    volumes:
+      - ./pgbouncer_userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    depends_on:
+      - postgres
+    ports:
+      - "${PGBOUNCER_PORT}:${PGBOUNCER_PORT}"
 
   redis:
     image: redis:7
@@ -48,7 +71,7 @@ services:
       - redis
 
   bot:
-    profiles: ["with-bot"]
+    profiles: [ "with-bot" ]
     environment:
       - WITH_BOT=true
     build:
@@ -56,7 +79,7 @@ services:
       dockerfile: Dockerfile
     container_name: manager_bot_bot
     command: /bin/bash -c "python manage.py deletewebhook && python manage.py runbot"
-    entrypoint: []
+    entrypoint: [ ]
     volumes:
       - ./logs:/app/logs
     restart: always
@@ -72,7 +95,7 @@ services:
     container_name: manager_bot_celery
     restart: always
     command: celery -A src worker --concurrency=2 --loglevel=INFO
-    entrypoint: []
+    entrypoint: [ ]
     volumes:
       - .:/app
     env_file:
