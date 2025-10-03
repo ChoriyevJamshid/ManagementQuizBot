@@ -104,7 +104,7 @@ DB_ALL = {
         'PASSWORD': env.str("DB_PASSWORD"),
         'HOST': env.str("DB_HOST"),
         'PORT': env.str("DB_PORT"),
-        'CONN_MAX_AGE': 60,
+        'CONN_MAX_AGE': 20,
     }
 }
 
