@@ -48,7 +48,7 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled=False):
         )
         index = 1
         gifts = ("🏆", "🏅", "🎖")
-        for player_tuple in sorted_players[:30]:
+        for player_tuple in sorted_players[:50]:
 
             username = player_tuple[-1]['username']
             corrects = player_tuple[-1]['corrects']
