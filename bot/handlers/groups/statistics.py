@@ -46,9 +46,8 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled=False):
             quantity=quantity,
             quiz_id=group_quiz.pk,
         )
-        index = 1
-        gifts = ("🏆", "🏅", "🎖")
-        for player_tuple in sorted_players[:50]:
+        gifts = ("🏆", "🏅", "🎖", "🏵", "🎗")
+        for index, player_tuple in enumerate(sorted_players[:50], start=1):
 
             username = player_tuple[-1]['username']
             corrects = player_tuple[-1]['corrects']
@@ -64,9 +63,12 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled=False):
                 users_text += f"{gifts[1]}. {username} - {corrects} ({formatted_spent_time})\n"
             elif index == 3:
                 users_text += f"{gifts[2]}. {username} - {corrects} ({formatted_spent_time})\n"
+            elif index == 4:
+                users_text += f"{gifts[3]}. {username} - {corrects} ({formatted_spent_time})\n"
+            elif index == 5:
+                users_text += f"{gifts[4]}. {username} - {corrects} ({formatted_spent_time})\n"
             else:
                 users_text += f"{index}. {username} - {corrects} ({formatted_spent_time})\n"
-            index += 1
 
         text = await get_text('group_quiz_finished', language, {
             "title": group_quiz.part.title,
