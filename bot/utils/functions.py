@@ -10,8 +10,8 @@ from django.conf import settings
 from aiogram import types
 
 
-def get_text_sync(code: str, language: str, parameters: Optional[Dict[str, str]] = None) -> str:
-    file_path = f"{settings.BASE_DIR}/languages/{language}.json"
+def get_text_sync(code: str, parameters: Optional[Dict[str, str]] = None) -> str:
+    file_path = f"{settings.BASE_DIR}/languages/uz.json"
 
     with open(file_path, mode='rb') as file:
         content = file.read()
@@ -28,8 +28,8 @@ def get_text_sync(code: str, language: str, parameters: Optional[Dict[str, str]]
     return text.strip()
 
 
-def get_texts_sync(codes: tuple | list, language: str) -> dict:
-    file_path = f"{settings.BASE_DIR}/languages/{language}.json"
+def get_texts_sync(codes: tuple | list) -> dict:
+    file_path = f"{settings.BASE_DIR}/languages/uz.json"
 
     with open(file_path, mode='rb') as file:
         content = file.read()
@@ -38,8 +38,8 @@ def get_texts_sync(codes: tuple | list, language: str) -> dict:
     return {code: data.get(code, '').strip() for code in codes}
 
 
-async def get_text(code: str, language: str, parameters: Optional[Dict[str, str]] = None) -> str:
-    file_path = f"{settings.BASE_DIR}/languages/{language}.json"
+async def get_text(code: str, parameters: Optional[Dict[str, str]] = None) -> str:
+    file_path = f"{settings.BASE_DIR}/languages/uz.json"
 
     async with aiofiles.open(file_path, mode='rb') as file:
         content = await file.read()
@@ -54,8 +54,8 @@ async def get_text(code: str, language: str, parameters: Optional[Dict[str, str]
     return text.strip()
 
 
-async def get_texts(codes: tuple | list, language: str) -> dict:
-    file_path = f"{settings.BASE_DIR}/languages/{language}.json"
+async def get_texts(codes: tuple | list) -> dict:
+    file_path = f"{settings.BASE_DIR}/languages/uz.json"
 
     async with aiofiles.open(file_path, mode='rb') as file:
         content = await file.read()
@@ -170,10 +170,10 @@ async def generate_unique_link(length: int = 8):
     return result
 
 
-async def testing_animation(callback: types.CallbackQuery, language):
+async def testing_animation(callback: types.CallbackQuery):
     animation_number = 2
     nums = ('1️⃣', '2️⃣', '3️⃣')
-    texts = await get_texts(('are_you_ready', 'starting', 'go_go'), language)
+    texts = await get_texts(('are_you_ready', 'starting', 'go_go'))
     texts = list(texts.values())
 
     await callback.message.delete_reply_markup()
@@ -236,34 +236,13 @@ def create_excel_statistics(
         file_path: str,
         sorted_players: list | tuple,
         quantity: int,
-        language: str = "en",
 ):
     cols_name = {
-        'name': {
-            'en': "Full Name",
-            'uz': "FIO",
-            'ru': "ФИО"
-        },
-        'corrects': {
-            'en': "Corrects",
-            'uz': "To‘g‘ri javoblar",
-            'ru': "Правильные ответы"
-        },
-        'wrongs': {
-            'en': "Wrongs",
-            'uz': "Noto‘g‘ri javoblar",
-            'ru': "Неправильные ответы"
-        },
-        'spent_time': {
-            'en': "Spend Time",
-            'uz': "Sarf qilingan vaqt",
-            'ru': "Затраченное время"
-        },
-        'percent': {
-            'en': "Percent",
-            'uz': "Foiz",
-            'ru': "Процент"
-        }
+        'name': "FIO",
+        'corrects': "To‘g‘ri javoblar",
+        'wrongs': "Noto‘g‘ri javoblar",
+        'spent_time': "Sarf qilingan vaqt",
+        'percent': "Foiz"
 
     }
     excel_data = []
@@ -277,16 +256,16 @@ def create_excel_statistics(
         formatted_time = reform_spent_time(player_data.get('spent_time'))
 
         excel_data.append({
-            cols_name["name"][language]: player_data.get('username'),
-            cols_name["corrects"][language]: player_data.get('corrects'),
-            cols_name["wrongs"][language]: player_data.get('wrongs'),
-            cols_name["spent_time"][language]: formatted_time,
-            cols_name["percent"][language]: f"{percent}%",
+            cols_name["name"]: player_data.get('username'),
+            cols_name["corrects"]: player_data.get('corrects'),
+            cols_name["wrongs"]: player_data.get('wrongs'),
+            cols_name["spent_time"]: formatted_time,
+            cols_name["percent"]: f"{percent}%",
         })
 
     columns = []
     for col_name in cols_name.values():
-        columns.append(col_name[language])
+        columns.append(col_name)
 
     df = pd.DataFrame(
         excel_data,

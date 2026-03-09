@@ -1,21 +1,22 @@
 import logging
 import orjson
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher
 from aiogram.client.bot import DefaultBotProperties
 from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
-from aiogram.fsm.storage.base import DefaultKeyBuilder
+from aiogram.types import Update
 from aiogram.fsm.storage.redis import RedisStorage
-from redis.asyncio.client import Redis
+from aiogram.fsm.storage.base import DefaultKeyBuilder
+
+from redis.asyncio import Redis, ConnectionPool
 
 from src.settings import API_TOKEN, REDIS_HOST, REDIS_PORT
+
 from bot import handlers, middlewares
 
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
+
+logger = logging.getLogger(__name__)
 
 
 def setup_handlers(dp: Dispatcher) -> None:
@@ -25,51 +26,74 @@ def setup_handlers(dp: Dispatcher) -> None:
 
 
 def setup_middlewares(dp: Dispatcher) -> None:
-    # dp.update.middleware(middlewares.LoggingMiddleware())
-    dp.update.middleware(middleware=middlewares.CheckingMiddleware())
-    pass
+    dp.message.middleware(middlewares.LoggingMiddleware())
+    dp.callback_query.middleware(middlewares.LoggingMiddleware())
+    # dp.message.middleware(middlewares.CheckingMiddleware())
+    # dp.callback_query.middleware(middlewares.CheckingMiddleware())
 
-class Webhook:
+
+class WebhookService:
+    """
+    Telegram webhook processor
+    Production ready version
+    """
+
     def __init__(self) -> None:
-        self.is_setup = False
+
+        session = AiohttpSession(json_loads=orjson.loads)
 
         self.bot = Bot(
             token=API_TOKEN,
-            session=AiohttpSession(json_loads=orjson.loads),
+            session=session,
             default=DefaultBotProperties(parse_mode=ParseMode.HTML)
         )
-        _redis = Redis(
+
+        pool = ConnectionPool(
             host=REDIS_HOST,
             port=REDIS_PORT,
-            db=2
+            db=2,
+            max_connections=10,
+            decode_responses=False
         )
-        key_builder = DefaultKeyBuilder(prefix="fsm_state")
+
+        redis = Redis(connection_pool=pool)
+
         storage = RedisStorage(
-            redis=_redis,
-            key_builder=key_builder,
+            redis=redis,
+            key_builder=DefaultKeyBuilder(prefix="fsm")
         )
+
         self.dp = Dispatcher(storage=storage)
 
+        setup_handlers(self.dp)
+        setup_middlewares(self.dp)
 
-    def setup_webhook(self):
-        if not self.is_setup:
-            setup_handlers(self.dp)
-            setup_middlewares(self.dp)
-            self.is_setup = True
+        logger.info("Telegram webhook initialized")
 
-    async def process(self, request):
-        return await self._process_update(request)
+    async def process_update(self, body: bytes) -> None:
+        """
+        Process incoming telegram update
+        """
 
-    async def _process_update(self, request):
-        update = types.Update.model_validate_json(request.body.decode("utf-8"))
-        await self.dp.feed_update(bot=self.bot, update=update)
-
-    async def process_body(self, body: str):
         try:
-            update = types.Update.model_validate_json(body)
-            await self.dp.feed_update(bot=self.bot, update=update)
-        except Exception as e:
-            logging.error(f"Webhook processing error: {e}")
+            update = Update.model_validate_json(body)
 
-webhook = Webhook()
-webhook.setup_webhook()
+            await self.dp.feed_update(
+                bot=self.bot,
+                update=update
+            )
+
+        except Exception:
+            logger.exception("Failed to process telegram update")
+
+    async def shutdown(self):
+        """
+        Graceful shutdown
+        """
+
+        logger.info("Shutting down telegram bot")
+
+        await self.bot.session.close()
+
+
+webhook = WebhookService()

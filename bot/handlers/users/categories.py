@@ -10,15 +10,14 @@ from bot.utils.functions import get_text, get_texts
 async def categories_handler(callback: types.CallbackQuery, state: FSMContext):
 
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     categories = await utils.get_categories()
     if not categories:
-        text = await get_text('categories_not_found', language)
+        text = await get_text('categories_not_found')
         return await callback.answer(text, show_alert=True)
 
-    text = await get_text('categories_list_text', language)
-    markup = await inline_kb.get_categories_markup(categories, language)
+    text = await get_text('categories_list_text')
+    markup = await inline_kb.get_categories_markup(categories)
 
     await callback.message.edit_text(text, reply_markup=markup)
     await state.set_state(MainState.categories)
@@ -27,13 +26,12 @@ async def categories_handler(callback: types.CallbackQuery, state: FSMContext):
 
 async def categories_detail_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     _, category_title, category_id = callback.data.split('_')
     quizzes = await utils.get_quizzes_by_category_id(category_id=category_id)
 
     if not quizzes:
-        text = await get_text('categories_category_not_quizzes', language, {
+        text = await get_text('categories_category_not_quizzes', {
             'title': category_title
         })
         return await callback.answer(text)
@@ -42,7 +40,7 @@ async def categories_detail_handler(callback: types.CallbackQuery, state: FSMCon
     page_number = 1
     total_pages = len(quizzes) // paginate_by if not len(quizzes) % paginate_by else len(quizzes) // paginate_by + 1
 
-    text = await get_text('categories_detail_text', language, {
+    text = await get_text('categories_detail_text', {
         'category': category_title,
     })
     text += "\n"
@@ -53,7 +51,7 @@ async def categories_detail_handler(callback: types.CallbackQuery, state: FSMCon
         text += f"\n<b>Quiz #{index}:</b> <i>{quiz.title}</i>"
         quiz_ids.append(quiz.id)
 
-    markup = await inline_kb.categories_detail_markup(quiz_ids, total_pages, page_number, language)
+    markup = await inline_kb.categories_detail_markup(quiz_ids, total_pages, page_number)
     await state.update_data({
         "cat_page_number": page_number,
         "cat_id": category_id,
@@ -66,7 +64,6 @@ async def categories_detail_handler(callback: types.CallbackQuery, state: FSMCon
 async def categories_paginate_handler(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     page_number = int(callback.data.split('_')[-1])
 
@@ -86,7 +83,7 @@ async def categories_paginate_handler(callback: types.CallbackQuery, state: FSMC
     from_i = (page_number - 1) * paginate_by
     to_i = page_number * paginate_by if page_number * paginate_by < len(quizzes) else len(quizzes)
 
-    text = await get_text('categories_detail_text', language, {
+    text = await get_text('categories_detail_text', {
         'category': category_title,
     })
     text += "\n"
@@ -97,7 +94,7 @@ async def categories_paginate_handler(callback: types.CallbackQuery, state: FSMC
         text += f"\n<b>Quiz #{index}:</b> <i>{quiz.title}</i>"
         quiz_ids.append(quiz.id)
 
-    markup = await inline_kb.categories_detail_markup(quiz_ids, total_pages, page_number, language)
+    markup = await inline_kb.categories_detail_markup(quiz_ids, total_pages, page_number)
     await state.update_data({
         "cat_page_number": page_number,
         "cat_title": category_title,
@@ -108,14 +105,13 @@ async def categories_paginate_handler(callback: types.CallbackQuery, state: FSMC
 
 async def categories_detail_quiz_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     quiz_id = int(callback.data.split('_')[-1])
 
     quiz = await utils.get_quiz_by_id(quiz_id)
     quiz_parts = await utils.get_quiz_parts(quiz_id)
 
-    text = await get_text('categories_detail_quiz_parts_text', language, {
+    text = await get_text('categories_detail_quiz_parts_text', {
         "title": quiz.title,
     })
     markup = await inline_kb.categories_quiz_parts_markup(
@@ -132,7 +128,6 @@ async def categories_back_to_quizzes_handler(callback: types.CallbackQuery, stat
 
     data = await state.get_data()
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     _, category_title, category_id = callback.data.split('_')
     quizzes = await utils.get_quizzes_by_category_id(category_id=category_id)
@@ -147,7 +142,7 @@ async def categories_back_to_quizzes_handler(callback: types.CallbackQuery, stat
     from_i = (page_number - 1) * paginate_by
     to_i = page_number * paginate_by if page_number * paginate_by < len(quizzes) else len(quizzes)
 
-    text = await get_text('categories_detail_text', language, {
+    text = await get_text('categories_detail_text', {
         'category': category_title,
     })
     text += "\n"
@@ -158,7 +153,7 @@ async def categories_back_to_quizzes_handler(callback: types.CallbackQuery, stat
         text += f"\n<b>Quiz #{index}:</b> <i>{quiz.title}</i>"
         quiz_ids.append(quiz.id)
 
-    markup = await inline_kb.categories_detail_markup(quiz_ids, total_pages, page_number, language)
+    markup = await inline_kb.categories_detail_markup(quiz_ids, total_pages, page_number)
     await state.update_data({
         "cat_page_number": page_number,
         "cat_title": category_title,
@@ -171,13 +166,12 @@ async def categories_back_to_quizzes_handler(callback: types.CallbackQuery, stat
 async def categories_detail_quiz_part_handler(callback: types.CallbackQuery, state: FSMContext):
 
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     link = callback.data.split('_')[-1]
     quiz_part = await utils.get_quiz_part(link)
 
     if not quiz_part:
-        text = await get_text('testing_quiz_part_not_found', language)
+        text = await get_text('testing_quiz_part_not_found')
         return await callback.answer(text)
 
     players_count = await utils.get_user_quizzes_count(quiz_part.id)
@@ -185,7 +179,7 @@ async def categories_detail_quiz_part_handler(callback: types.CallbackQuery, sta
 
     if players_count == 0:
         text = await get_text(
-            'testing_quiz_part_info_not_answered', language,
+            'testing_quiz_part_info_not_answered',
             {
                 "from_i": str(quiz_part.from_i),
                 "to_i": str(quiz_part.to_i),
@@ -196,7 +190,7 @@ async def categories_detail_quiz_part_handler(callback: types.CallbackQuery, sta
         )
     else:
         text = await get_text(
-            'testing_quiz_part_info_answered', language,
+            'testing_quiz_part_info_answered',
             {
                 "from_i": str(quiz_part.from_i),
                 "to_i": str(quiz_part.to_i),
@@ -208,7 +202,6 @@ async def categories_detail_quiz_part_handler(callback: types.CallbackQuery, sta
         )
     markup = await inline_kb.test_manage_markup(
         part_id=quiz_part.id,
-        language=language,
         username=data_solo.username,
         link=quiz_part.link
     )

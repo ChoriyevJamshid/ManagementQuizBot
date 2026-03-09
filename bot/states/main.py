@@ -13,7 +13,6 @@ class MainState(StatesGroup):
 
 class CreateQuizState(StatesGroup):
     title = State()
-    category = State()
     file = State()
     timer = State()
     check = State()

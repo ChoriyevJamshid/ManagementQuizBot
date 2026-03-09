@@ -8,6 +8,7 @@ from bot.utils import get_user
 from bot.keyboards import reply_kb
 from bot.utils.functions import get_texts
 from bot.states import MainState
+from utils import Role
 
 
 class RegisteredFilter(Filter):
@@ -23,15 +24,21 @@ class RegisteredFilter(Filter):
             message = event.message
 
         if message:
-            user = await get_user(message.from_user)
-            if user.language is None \
-                    or user.is_registered \
+            user = await get_user(event.from_user)
+            current_state = await state.get_state()
+
+            if user.role not in (Role.ADMIN, Role.MODERATOR):
+                return False
+            
+            if user.is_registered \
                     or message.content_type == ContentType.CONTACT:
                 return True
+                
+            if isinstance(event, Message) and current_state == MainState.share_contact.state:
+                return True
 
-            language = user.language or 'en'
             texts = await get_texts(
-                ('user_share_contact_for_register_text', 'share_contact_text'), language
+                ('user_share_contact_for_register_text', 'share_contact_text')
             )
             try:
                 await message.delete_reply_markup()
@@ -46,5 +53,5 @@ class RegisteredFilter(Filter):
 
             if isinstance(event, CallbackQuery):
                 await event.answer()
-            return False
+            return True
         return True

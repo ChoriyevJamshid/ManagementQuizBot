@@ -31,7 +31,6 @@ def group_quiz_create_file(
         sorted_players: list | tuple, quantity: int
 ):
     quiz  = GroupQuiz.objects.filter(pk=quiz_id).first()
-    language = quiz.language or 'en'
     if not quiz:
         return None
 
@@ -43,8 +42,7 @@ def group_quiz_create_file(
     create_excel_statistics(
         file_path=file_path,
         sorted_players=sorted_players,
-        quantity=quantity,
-        language=language
+        quantity=quantity
     )
 
     if os.path.exists(file_path):
@@ -57,47 +55,6 @@ def group_quiz_create_file(
 
     return None
 
-
-@shared_task
-def send_notify_to_quiz_owner(
-        quiz_id: int,
-        user_chat_id: int,
-        group_credential: str,
-        user_credential: str,
-):
-    quiz = Quiz.objects.filter(id=quiz_id).select_related('owner').first()
-    if not quiz:
-        return None
-
-    telegram_id = quiz.owner.chat_id
-    language = quiz.owner.language or 'en'
-
-    text = get_text_sync(
-        code='send_notify_to_quiz_owner',
-        language=language,
-        parameters={
-            'quizname': quiz.title,
-            'username': user_credential,
-            'groupname': group_credential
-        })
-
-    btn_texts = get_texts_sync((
-        'accept_user_button', 'decline_user_button'
-    ), language)
-    a_text = btn_texts['accept_user_button']
-    d_text = btn_texts['decline_user_button']
-
-    reply_markup = {
-        "inline_keyboard": [
-            [
-                {"text": f"{a_text}", "callback_data": f"accept-user-to-use-quiz_yes_{user_chat_id}_{quiz_id}"},
-                {"text": f"{d_text}", "callback_data": f"accept-user-to-use-quiz_no_{user_chat_id}_{quiz_id}"}
-            ],
-        ]
-    }
-
-    send_text(chat_id=telegram_id, text=text, reply_markup=reply_markup)
-    return None
 
 
 

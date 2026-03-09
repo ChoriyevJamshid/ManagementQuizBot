@@ -35,11 +35,6 @@ class Quiz(BaseModel):
         null=True,
         related_name="quizzes"
     )
-    allowed_users = models.JSONField(
-        default=list,
-        blank=True,
-        null=True
-    )
 
     title = models.CharField(max_length=127)
     file_id = models.CharField(max_length=255)
@@ -49,11 +44,6 @@ class Quiz(BaseModel):
     privacy = models.BooleanField(default=True)
 
     objects = models.Manager()
-
-    def save(self, *args, **kwargs):
-        if not self.allowed_users:
-            self.allowed_users = []
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title
@@ -142,7 +132,6 @@ class GroupQuiz(BaseModel):
     user = models.ForeignKey("common.TelegramProfile", on_delete=models.CASCADE, related_name="group_quizzes")
 
     title = models.CharField(max_length=127, blank=True, null=True)
-    language = models.CharField(max_length=7, blank=True, null=True)
     invite_link = models.URLField(blank=True, null=True)
 
     group_id = models.CharField(max_length=63)

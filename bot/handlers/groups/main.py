@@ -8,21 +8,18 @@ from bot import utils
 from bot.keyboards import inline_kb
 from bot.utils.functions import get_text
 
-from quiz.tasks import (
-    get_group_invite_link,
-    send_notify_to_quiz_owner
-)
+from quiz.tasks import get_group_invite_link
 from .statistics import send_statistics
 from .testing import testing_send_tests_by_recurse
-from .common import get_creator, check_quiz_part_owner
+from .common import get_creator, check_user_role
+from bot.utils import redis_group
 
 
 async def stop_handler(message: types.Message):
     group_quiz = await utils.get_group_quiz(str(message.chat.id))
     member = await message.bot.get_chat_member(chat_id=message.chat.id, user_id=message.from_user.id)
-    language = group_quiz.language or "en"
     if group_quiz is None:
-        text = await get_text('testing_not_active_quiz', language)
+        text = await get_text('testing_not_active_quiz')
         return message.answer(text)
 
     if (group_quiz.user.chat_id == str(message.from_user.id)) \
@@ -30,7 +27,7 @@ async def stop_handler(message: types.Message):
             or (message.sender_chat and message.chat.id == message.sender_chat.id):
         return await send_statistics(group_quiz.group_id, message.bot, is_cancelled=True)
 
-    text = await get_text('group_only_owner_can_stop_quiz', language, )
+    text = await get_text('group_only_owner_can_stop_quiz', )
     return await message.answer(text)
 
 
@@ -41,14 +38,13 @@ async def start_handler(message: types.Message):
         tg_user = message.from_user
 
     if not tg_user:
-        text = await get_text("group_make_bot_as_admin", 'en')
+        text = await get_text("group_make_bot_as_admin", 'uz')
         return await message.answer(text)
 
     user = await utils.get_user(tg_user)
     if len(message.text.split(' ')) == 1:
         return None
 
-    language = user.language or "en"
     link = message.text.split(' ')[-1]
     if not await utils.exists_quiz_part(link):
         return None
@@ -58,20 +54,14 @@ async def start_handler(message: types.Message):
     if group_quiz is None:
         quiz_part = await utils.get_quiz_part(link)
 
-        print(f"\n{quiz_part.quiz.privacy is True = }\n")
-        print(f"\n{user.chat_id != quiz_part.quiz.owner.chat_id = }\n")
-        print(f"\n{user.chat_id not in quiz_part.quiz.allowed_users = }\n")
-        print(f"{quiz_part.quiz.allowed_users = }")
+        is_allowed = await check_user_role(user, message)
 
-        print(f"\n{user.role = }\n")
-        is_owner = await check_quiz_part_owner(quiz_part, user, message, language)
-
-        print(f"\n{is_owner = }\n")
-        if not is_owner:
+        print(f"\n{is_allowed = }\n")
+        if not is_allowed:
             return None
             # group_cred = message.chat.username or message.chat.title
             # user_cred = user.username or user.phone_number or user.first_name
-            # text = await get_text('testing_group_quiz_is_private', language)
+            # text = await get_text('testing_group_quiz_is_private')
             #
             # await message.answer(text)
             # return send_notify_to_quiz_owner.delay(
@@ -88,11 +78,11 @@ async def start_handler(message: types.Message):
             message_id=str(message.message_id + 1),
             title=message.chat.title,
             invite_link=message.chat.invite_link,
-            language=language
+             
         )
 
         text = await get_text(
-            'testing_group_quiz_part_ready_info', language,
+            'testing_group_quiz_part_ready_info',
             {
                 "from_i": str(quiz_part.from_i),
                 "to_i": str(quiz_part.to_i),
@@ -101,7 +91,7 @@ async def start_handler(message: types.Message):
                 "title": str(quiz_part.title),
             }
         )
-        markup = await inline_kb.group_ready_markup(str(message.chat.id), language)
+        markup = await inline_kb.group_ready_markup(str(message.chat.id))
         return await message.answer(text, reply_markup=markup)
 
     if group_quiz.status == QuizStatus.INIT:
@@ -118,8 +108,8 @@ async def start_handler(message: types.Message):
         if quiz_part.id != group_quiz.part_id:
             group_quiz.part_id = quiz_part.id
 
-        is_owner = await check_quiz_part_owner(quiz_part, user, message, language)
-        if not is_owner:
+        is_allowed = await check_user_role(user, message)
+        if not is_allowed:
             return None
 
         group_quiz.data = dict()
@@ -127,7 +117,7 @@ async def start_handler(message: types.Message):
         group_quiz.user = user
 
         text = await get_text(
-            'testing_group_quiz_part_ready_info', language,
+            'testing_group_quiz_part_ready_info',
             {
                 "from_i": str(quiz_part.from_i),
                 "to_i": str(quiz_part.to_i),
@@ -137,12 +127,12 @@ async def start_handler(message: types.Message):
             }
         )
 
-        markup = await inline_kb.group_ready_markup(str(message.chat.id), language)
+        markup = await inline_kb.group_ready_markup(str(message.chat.id))
         await message.answer(text, reply_markup=markup)
         return await group_quiz.asave(update_fields=['message_id', 'part_id', 'data', 'user'])
 
 
-    text = await get_text('testing_quiz_active_not_stopped', language, {
+    text = await get_text('testing_quiz_active_not_stopped', {
         'title': str(group_quiz.part.quiz.title)
     })
     return await message.answer(text)
@@ -150,16 +140,11 @@ async def start_handler(message: types.Message):
 
 async def get_ready_callback_handler(callback: types.CallbackQuery, state: FSMContext):
     group_quiz = await utils.get_group_quiz(group_id=str(callback.message.chat.id))
-    language = group_quiz.language or "en"
 
     if group_quiz is None:
         return await callback.answer()
 
     if callback.from_user.is_bot:
-        return await callback.answer()
-
-    players_data = group_quiz.data.get('players', {})
-    if players_data.get(str(callback.from_user.id)):
         return await callback.answer()
 
     if callback.from_user.username:
@@ -169,27 +154,29 @@ async def get_ready_callback_handler(callback: types.CallbackQuery, state: FSMCo
         if callback.from_user.last_name:
             username += " " + callback.from_user.last_name
 
-    players_data[str(callback.from_user.id)] = {
-        'corrects': 0,
-        'wrongs': 0,
-        'spent_time': 0,
-        'username': username,
-    }
+    # Atomically add the player to Redis (if they aren't already there)
+    await redis_group.add_player_to_group_quiz(
+        group_quiz_id=str(group_quiz.pk),
+        user_id=str(callback.from_user.id),
+        username=username
+    )
+    
+    # Get total count directly from Redis Hash length
+    players_count = await redis_group.get_players_count(str(group_quiz.pk))
 
     text = await get_text(
         'testing_group_quiz_part_ready_info_with_ready_counter',
-        language,
         {
             "from_i": str(group_quiz.part.from_i),
             "to_i": str(group_quiz.part.to_i),
             "quantity": str(group_quiz.part.quantity),
             "timer": str(group_quiz.part.quiz.timer),
             "title": str(group_quiz.part.title),
-            "count": str(len(players_data.keys())),
+            "count": str(players_count),
         }
     )
-    callback_text = await get_text('group_test_starts_soon', language)
-    markup = await inline_kb.group_ready_markup(str(callback.message.chat.id), language)
+    callback_text = await get_text('group_test_starts_soon')
+    markup = await inline_kb.group_ready_markup(str(callback.message.chat.id))
 
     try:
         await callback.bot.edit_message_text(
@@ -202,18 +189,16 @@ async def get_ready_callback_handler(callback: types.CallbackQuery, state: FSMCo
         pass
 
     await callback.answer(callback_text)
-    if group_quiz.status == QuizStatus.INIT and len(players_data) >= 2:
+    
+    if group_quiz.status == QuizStatus.INIT and players_count >= 2:
         group_quiz.status = QuizStatus.STARTED
-        group_quiz.data['players'] = players_data
-        await group_quiz.asave(update_fields=['data', 'status'])
+        await group_quiz.asave(update_fields=['status'])
 
         await asyncio.sleep(10)
         return await testing_send_tests_by_recurse(group_quiz, callback, state)
 
     if not group_quiz.invite_link:
         get_group_invite_link.delay(group_quiz.pk)
-    group_quiz.data['players'] = players_data
-    return await group_quiz.asave(update_fields=['data', 'status'])
 
 
 

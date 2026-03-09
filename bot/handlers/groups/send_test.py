@@ -8,6 +8,7 @@ from aiogram.fsm.context import FSMContext
 from bot import utils
 from bot.keyboards import inline_kb
 from bot.utils.functions import get_text
+from bot.utils import redis_group
 from .statistics import send_statistics
 
 
@@ -29,21 +30,20 @@ async def send_tests_by_recurse(
     if not group_quiz:
         return None
 
-    language = group_quiz.language or "en"
     if index != 0 and not group_quiz.is_answered:
         group_quiz.skips += 1
         await group_quiz.asave(update_fields=['skips'])
 
     if group_quiz.is_answered:
+        await type(group_quiz).objects.filter(pk=group_quiz.pk).aupdate(is_answered=False)
         group_quiz.is_answered = False
-        await group_quiz.asave(update_fields=['is_answered'])
 
     if group_quiz.skips == 2:
         group_quiz.skips = 0
         await group_quiz.asave(update_fields=['skips'])
 
-        text = await get_text('group_noone_answer_to_questions', language)
-        markup = await inline_kb.test_group_continue_markup(group_id, index, language)
+        text = await get_text('group_noone_answer_to_questions')
+        markup = await inline_kb.test_group_continue_markup(group_id, index)
 
         return await callback.bot.send_message(
             chat_id=group_id,
@@ -72,9 +72,14 @@ async def send_tests_by_recurse(
 
     group_quiz.poll_id = poll.poll.id
     group_quiz.index = index + 1
-    group_quiz.data['start_time'] = time.perf_counter()
-    group_quiz.data['correct_option_id'] = correct_option_id
-    await group_quiz.asave(update_fields=['poll_id', 'index', 'data'])
+    await group_quiz.asave(update_fields=['poll_id', 'index'])
+
+    # Save timing and correct answers directly to Redis for the answer handlers
+    await redis_group.set_group_question_data(
+        group_quiz_id=str(group_quiz.pk),
+        correct_option_id=correct_option_id,
+        start_time=time.perf_counter()
+    )
 
     await asyncio.sleep(timer + 2)
     return await send_tests_by_recurse(
