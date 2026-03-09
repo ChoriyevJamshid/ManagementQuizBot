@@ -55,6 +55,7 @@ services:
     volumes:
       - ./:/app
       - ./static:/app/static
+      - ./staticfiles:/app/staticfiles
       - ./media:/app/media
       - ./locale:/app/locale
       - ./logs:/app/logs
