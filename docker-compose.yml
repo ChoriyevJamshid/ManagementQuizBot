@@ -17,7 +17,7 @@ services:
 
   pgbouncer:
     image: edoburu/pgbouncer
-    container_name: blacklistv2_pgbouncer
+    container_name: manager_bot_pgbouncer
     restart: always
     env_file:
       - ./.env
