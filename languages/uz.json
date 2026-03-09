@@ -23,7 +23,7 @@
   "support_add_category_text": "🆕 <strong>Yangi kategoriya nomini kiriting!</strong>\n<em>⚠️ Kategoriya nomi 60 ta belgidan ko‘p bo‘lmasligi kerak. 🛠 Adminlar tomonidan ko‘rib chiqilib, qo‘shiladi. </em>\n<em>❌ Bekor qilish uchun </em>/<strong>cancelCName </strong><em>buyrug‘ini yuboring.</em>",
   "create_quiz_file_size_limit_exceeded": "📂⚠️ <strong>Faylning hajmi 200 KB dan oshmasligi kerak.</strong>\n<em>🚫 Quiz yaratishni bekor qilish uchun /cancel buyrug'ini yuboring.</em>",
   "testing_user_stops_answering": "⚠️ Siz javov berish toxtatdingiz. Quizni davom ettirish uchun davom ettirish tugmasini bosing. Quizni tugatish uchun /<strong>stopQuiz </strong>buyrug'ini yuboring.",
-  "create_quiz_check_before_save": "<strong>Quiz ma'lumotlari:</strong>\n✅ <strong>nomi</strong> - __title.\n✅ <strong>categoriyasi</strong> - __category.\n⏱️ <strong>taymer</strong> - __timer soniya.\n❓ <strong>savollar soni</strong> - __quantity ta.\n \n<em>🚫 Quiz yaratishni bekor qilish uchun /cancel buyrug'ini yuboring.</em>",
+  "create_quiz_check_before_save": "<strong>Quiz ma'lumotlari:</strong>\n✅ <strong>nomi</strong> - __title.\n❓ <strong>savollar soni</strong> - __quantity ta.\n🧩 <strong>har bo'limdagi savollar</strong> - __part_quantity ta.\n⏱️ <strong>taymer</strong> - __timer.\n \n<em>🚫 Quiz yaratishni bekor qilish uchun /cancel buyrug'ini yuboring.</em>",
   "instruction_text": "📝 <strong>Text faylida savollar yaratish bo‘yicha qo‘llanma</strong>\n \n📌 <strong>1. Savollar va variantlarni tartib bilan yozish</strong>\n➖ Har bir savol va javoblar alohida qatorlarda yozilishi kerak.\n \n📌 <strong>2. Savol va javoblarni to‘ldirish tartibi</strong>\n➖ <strong>Birinchi navbatda savol kiritiladi.</strong> ✍️\n➖ Savol ostidan <strong>to‘g‘ri javob kiritiladi.</strong> ✅\n➖ <strong>To‘g‘ri javobdan keyin, birin ketin boshqa javob variantlari kiritiladi.</strong>\n \n❌ 📄 <strong>Tayyor faylni botga yuklang va test yaratishni boshlang!</strong> 🚀 __url",
   "group_quiz_finished": "🎉 <strong>__title</strong> <strong>Quiz tugadi!</strong>\n \n🎉 <strong>__count</strong> savollarga javob berildi\n\r\n <strong>__users</strong>\n🏆 G'oliblarni tabriklaymiz! 🏅",
   "create_quiz_not_allowed_title": "<strong>❗️ Quiz </strong>uchun boshqa <strong>nom </strong>kiriting. <strong>Quiz nomi</strong> <strong>/</strong> - belgisi bilan boshlanishi mumkin emas. <strong>/ </strong>- belgi bilan boshlangan so'zlar<strong> buyruq</strong> sifatida qabul qilinadi.\n \n<em>🚫 Quiz yaratishni bekor qilish uchun /cancel buyrug'ini yuboring.</em>",
@@ -66,6 +66,11 @@
   "edit_quiz_timer": "🔄 Quiz savollari uchun yangi taymer kiriting. Ushbu tugmalardan foydalaning 👇",
   "testing_quiz_active_not_stopped": "💬 Hozirda <strong>__title </strong>quiz aktiv holatda. Avval quizni toxtating /<strong>stopQuiz</strong>.",
   "create_quiz_file_not_document": "❗️ <strong>Fayl topilmadi. Savollaringiz mavjud faylni yuklang.</strong>\n<em>🚫 Quiz yaratishni bekor qilish uchun /cancel buyrug'ini yuboring.</em>",
+  "create_quiz_file_parse_error": "⚠️ <strong>Faylni o'qishda xatolik yuz berdi.</strong>\n<em>Fayl formati va tarkibini tekshirib, qayta yuboring.</em>",
+  "create_quiz_part_quantity": "🧩 <strong>Har bir bo'lim uchun savollar sonini tanlang:</strong> 20, 25, 30 yoki 35.",
+  "create_quiz_part_quantity_not_allowed": "❗️ <strong>Iltimos, faqat quyidagi tugmalardan birini tanlang:</strong> 20, 25, 30 yoki 35.",
+  "create_quiz_part_quantity_too_large": "⚠️ <strong>Tanlangan qiymat juda katta.</strong>\n<em>Maksimal ruxsat etilgan qiymat: __max_quantity</em>",
+  "create_quiz_create_error": "⚠️ <strong>Quizni saqlashda xatolik yuz berdi.</strong>\n<em>Iltimos, yana bir bor urinib ko'ring.</em>",
   "quiz_list_user_quizzes": "📃 <strong>Barcha quizlaringiz ro'yhati.</strong>",
   "poll_question": "<strong>Quyidagi javoblardan birini tanlang ?</strong>",
   "quiz_list_detail_quiz_parts": "📑 <strong>Quizga tegishli barcha bo'limlari.</strong>",
@@ -151,5 +156,6 @@
   "user_allowed_by_owner": "Sizga viktorina egasi tomonidan \"__<strong>title</strong>\" viktorinasidan foydalanishga ruxsat berildi.",
   "registered_success_text": "Siz muvaffaqiyatli ro‘yxatdan o‘tdingiz.",
   "use_below_buttons_text": "Davom etish uchun quyidagi tugmalardan foydalaning.",
+  "testing_not_allowed_role": "🚫 Ushbu testni faqat adminlar va moderatorlar boshlay oladi.",
   "send_notify_to_quiz_owner": "⚠️ Foydalanuvchi sizning viktorinangizdan ruxsatsiz foydalanishga urindi.\n\r\nAgar uni bilsangiz, ushbu viktorina uchun ruxsat berilgan foydalanuvchilar ro‘yxatiga qo‘shishingiz mumkin. Aks holda, so‘rovni rad etishingiz mumkin.\n \n<strong>Foydalanuvchi</strong>: <em>__username</em>\n<strong>Guruh</strong>: <em>__groupname</em>\n<strong>Viktorina</strong>: <em>__quizname</em>"
 }

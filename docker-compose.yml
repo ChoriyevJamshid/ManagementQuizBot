@@ -81,6 +81,7 @@ services:
     command: /bin/bash -c "python manage.py deletewebhook && python manage.py runbot"
     entrypoint: [ ]
     volumes:
+      - ./:/app
       - ./logs:/app/logs
     restart: always
     depends_on:

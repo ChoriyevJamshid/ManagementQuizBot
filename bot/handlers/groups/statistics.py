@@ -8,9 +8,12 @@ from quiz.choices import QuizStatus
 from bot import utils
 from bot.keyboards import inline_kb
 
-from bot.utils import texts
-from bot.utils.functions import reform_spent_time
-
+from bot.utils.functions import (
+    get_text,
+    get_texts,
+    reform_spent_time
+)
+from bot.utils import redis_group
 from quiz.tasks import group_quiz_create_file
 
 
@@ -22,13 +25,16 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled=False):
     if not group_quiz:
         return None
 
-    if group_quiz.answers == 0:
-        text = texts.group_quiz_finished_noone_took_part.format(
-            title=group_quiz.part.quiz.title
-        )
+    # Pull final results directly from fast memory
+    players = await redis_group.get_all_players_data(str(group_quiz.pk))
+
+    if not players:
+        text = await get_text('group_quiz_finished_noone_took_part', {
+            "title": group_quiz.part.quiz.title
+        })
     else:
         users_text = str()
-        players = group_quiz.data.get('players', {})
+        
         sorted_players = sorted(players.items(), key=lambda item: (-item[1]['corrects'], item[1]['spent_time']))
         quantity = group_quiz.part.quiz.quantity
 
@@ -42,9 +48,8 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled=False):
             quantity=quantity,
             quiz_id=group_quiz.pk,
         )
-        index = 1
-        gifts = ("🏆", "🏅", "🎖")
-        for player_tuple in sorted_players[:30]:
+        gifts = ("🏆", "🏅", "🎖", "🏵", "🎗")
+        for index, player_tuple in enumerate(sorted_players[:50], start=1):
 
             username = player_tuple[-1]['username']
             corrects = player_tuple[-1]['corrects']
@@ -60,29 +65,41 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled=False):
                 users_text += f"{gifts[1]}. {username} - {corrects} ({formatted_spent_time})\n"
             elif index == 3:
                 users_text += f"{gifts[2]}. {username} - {corrects} ({formatted_spent_time})\n"
+            elif index == 4:
+                users_text += f"{gifts[3]}. {username} - {corrects} ({formatted_spent_time})\n"
+            elif index == 5:
+                users_text += f"{gifts[4]}. {username} - {corrects} ({formatted_spent_time})\n"
             else:
                 users_text += f"{index}. {username} - {corrects} ({formatted_spent_time})\n"
-            index += 1
 
+        text = await get_text('group_quiz_finished', {
+            "title": group_quiz.part.title,
+            "count": str(group_quiz.answers),
+            "users": str(users_text),
 
-        text = texts.group_quiz_finished.format(
-            title=group_quiz.part.title,
-            count=str(group_quiz.answers),
-            users=str(users_text)
-        )
+        })
 
-    button_texts = {
-        'get_excel_button': texts.get_excel_button,
-        'share_quiz_button': texts.share_quiz_button
-    }
-
+    texts = await get_texts(('share_quiz_button', 'get_excel_button'))
     markup = await inline_kb.test_group_share_quiz(
-        texts=button_texts,
+        texts=texts,
         link=group_quiz.part.link,
         group_quiz_id=group_quiz.pk,
+         
     )
     await bot.send_message(chat_id=group_id, text=text, reply_markup=markup)
 
+    # Permanently archive the results into PostgreSQL and clean up Redis!
+    if not isinstance(group_quiz.data, dict):
+        group_quiz.data = {}
+        
+    if players:
+        group_quiz.data['players'] = players
+        
     group_quiz.status = QuizStatus.CANCELED if is_cancelled else QuizStatus.FINISHED
     group_quiz.participant_count = len(players) if players else 0
-    return await group_quiz.asave(update_fields=['participant_count', 'status', 'updated_at'])
+    await group_quiz.asave(update_fields=['data', 'participant_count', 'status', 'updated_at'])
+    
+    # Wipe Redis clean since test is over
+    await redis_group.delete_group_quiz_data(group_quiz_id=str(group_quiz.pk))
+    return
+

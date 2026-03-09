@@ -11,12 +11,11 @@ from bot.utils.functions import get_text, get_texts
 
 async def support_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     texts = await get_texts((
         "support_menu_text", 'appeal_to_admin_button',
         'add_category_button', 'testing_questions_file'
-    ), language)
+    ))
     markup = await inline_kb.support_menu_markup(texts)
 
     await callback.message.edit_text(text=texts['support_menu_text'], reply_markup=markup)
@@ -27,13 +26,12 @@ async def support_handler(callback: types.CallbackQuery, state: FSMContext):
 
 async def support_appeal_to_admin_menu_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     texts = await get_texts((
         'support_appeal_to_admin_menu_text',
         'writen_messages_button',
         'write_new_message_button'
-    ), language)
+    ))
     markup = await inline_kb.support_appeal_to_admin_markup(texts)
 
     await callback.message.edit_text(
@@ -55,11 +53,10 @@ async def support_appeal_to_admin_handler(callback: types.CallbackQuery, state: 
 
 async def support_messages(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     messages = await utils.get_support_messages(user.id)
     if not messages:
-        text = await get_text("support_messages_not_found", language)
+        text = await get_text("support_messages_not_found")
         return await callback.answer(text, show_alert=True)
 
     texts = await get_texts((
@@ -72,7 +69,7 @@ async def support_messages(callback: types.CallbackQuery, state: FSMContext):
         'already_read_text',
         'not_read_yet_text',
         'me_read_text',
-    ), language)
+    ))
     await callback.answer()
     for _message in messages:
         _answer = texts['not_answered_text'] if not _message.answer else _message.answer
@@ -98,7 +95,6 @@ async def support_messages(callback: types.CallbackQuery, state: FSMContext):
 
 async def support_mark_message_as_read_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     message_id = int(callback.data.split('_')[-1])
     _message = await utils.get_support_message(message_id)
@@ -121,7 +117,7 @@ async def support_mark_message_as_read_handler(callback: types.CallbackQuery, st
         'already_read_text',
         'not_read_yet_text',
         'me_read_text',
-    ), language)
+    ))
 
     _answer = texts['not_answered_text'] if not _message.answer else _message.answer
     _read = texts['already_read_text'] if _message.is_read else texts['not_read_yet_text']
@@ -143,9 +139,8 @@ async def support_mark_message_as_read_handler(callback: types.CallbackQuery, st
 
 async def support_write_new_message(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
-    text = await get_text("support_appeal_to_admin_text", language)
+    text = await get_text("support_appeal_to_admin_text")
 
     await callback.answer()
     await callback.message.edit_text(text=text)
@@ -154,21 +149,20 @@ async def support_write_new_message(callback: types.CallbackQuery, state: FSMCon
 
 async def support_get_new_message_handler(message: types.Message, state: FSMContext):
     user = await utils.get_user(message.from_user)
-    language = user.language if user.language else 'en'
 
     if message.text:
         if message.text == "/cancelMessage":
-            text = await get_text("support_get_writen_message_canceled", language)
+            text = await get_text("support_get_writen_message_canceled")
             await message.answer(text=text)
         else:
-            text = await get_text("support_get_writen_message_text", language)
+            text = await get_text("support_get_writen_message_text")
             await message.answer(text=text)
             await utils.create_support_message(user.id, message.text)
 
         texts = await get_texts((
             "support_menu_text", 'appeal_to_admin_button',
             'add_category_button', 'testing_questions_file'
-        ), language)
+        ))
 
         markup = await inline_kb.support_menu_markup(texts)
 
@@ -177,16 +171,15 @@ async def support_get_new_message_handler(message: types.Message, state: FSMCont
         await state.set_state(SupportState.support)
         return
 
-    text = await get_text("support_get_writen_message_not_allowed", language)
+    text = await get_text("support_get_writen_message_not_allowed")
     await message.answer(text=text)
     return
 
 
 async def support_add_category_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
-    text = await get_text("support_add_category_text", language)
+    text = await get_text("support_add_category_text")
     await callback.message.edit_text(text=text, reply_markup=None)
     await state.set_state(SupportState.addCategoryTitle)
     await callback.answer()
@@ -194,10 +187,9 @@ async def support_add_category_handler(callback: types.CallbackQuery, state: FSM
 
 async def support_add_category_title_handler(message: types.Message, state: FSMContext):
     user = await utils.get_user(message.from_user)
-    language = user.language if user.language else 'en'
 
     if not message.text:
-        text = await get_text("message_object_not_text", language)
+        text = await get_text("message_object_not_text")
         await message.answer(text=text)
         return
 
@@ -205,7 +197,7 @@ async def support_add_category_title_handler(message: types.Message, state: FSMC
         texts = await get_texts((
             "support_menu_text", 'appeal_to_admin_button',
             'add_category_button', 'testing_questions_file'
-        ), language)
+        ))
         markup = await inline_kb.support_menu_markup(texts)
 
         await message.answer(text=texts['support_menu_text'], reply_markup=markup)
@@ -214,19 +206,19 @@ async def support_add_category_title_handler(message: types.Message, state: FSMC
         return
 
     if len(message.text) > 60:
-        text = await get_text("support_add_category_not_allowed_length_text", language)
+        text = await get_text("support_add_category_not_allowed_length_text")
         await message.answer(text=text)
         return
 
     new_category = await utils.create_pending_category(message.text)
-    text = await get_text("support_add_category_new_category_saved_success", language, {
+    text = await get_text("support_add_category_new_category_saved_success", {
         "title": new_category.title if new_category else "",
     })
 
     texts = await get_texts((
         "support_menu_text", 'appeal_to_admin_button',
         'add_category_button', 'testing_questions_file'
-    ), language)
+    ))
     markup = await inline_kb.support_menu_markup(texts)
     await message.answer(text=text)
     await message.answer(text=texts['support_menu_text'], reply_markup=markup)
@@ -237,6 +229,5 @@ async def support_add_category_title_handler(message: types.Message, state: FSMC
 
 async def support_testing_questions_file_handler(callback: types.CallbackQuery, state: FSMContext):
     # user = await utils.get_user(callback.from_user)
-    # language = user.language if user.language else 'en'
 
     return await callback.answer("This feature is not yet completed. 🚧🔧❌")

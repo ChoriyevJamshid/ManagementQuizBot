@@ -2,10 +2,9 @@ from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder, InlineKeyboardButton, InlineKeyboardMarkup
 from bot import utils
 from bot.utils.functions import get_texts, get_text
-from bot.utils import texts
 
 
-async def languages_markup():
+async def get_languages_markup():
     builder = InlineKeyboardBuilder()
     languages = await utils.get_languages()
     for language in languages:
@@ -17,16 +16,15 @@ async def languages_markup():
     return builder.adjust(*(1,)).as_markup()
 
 
-async def main_menu_markup(language: str):
+async def main_menu_markup():
     builder = InlineKeyboardBuilder()
     texts = await get_texts((
         'my_quizzes_button',
         'create_quiz_button',
-        'change_language_button',
         'instruction_button',
         'categories_button',
         'support_button'
-    ), language)
+    ))
 
     builder.add(InlineKeyboardButton(
         text=texts['my_quizzes_button'], callback_data=f"menu-quizzes"
@@ -43,14 +41,11 @@ async def main_menu_markup(language: str):
     builder.add(InlineKeyboardButton(
         text=texts['support_button'], callback_data=f"menu-support"
     ))
-    builder.add(InlineKeyboardButton(
-        text=texts['change_language_button'], callback_data=f"menu-change-language"
-    ))
 
     return builder.adjust(*(2, 2, 1,)).as_markup()
 
 
-async def get_quizzes_markup(quiz_data: dict, state: FSMContext, language: str):
+async def get_quizzes_markup(quiz_data: dict, state: FSMContext):
     data = await state.get_data()
     builder = InlineKeyboardBuilder()
     _builder = InlineKeyboardBuilder()
@@ -81,10 +76,10 @@ async def get_quizzes_markup(quiz_data: dict, state: FSMContext, language: str):
     return builder.adjust(*(2,)).attach(_builder.adjust(*(size, 1))).as_markup()
 
 
-async def quiz_detail_markup(quiz, language: str):
+async def quiz_detail_markup(quiz):
     builder = InlineKeyboardBuilder()
 
-    texts = await get_texts(('edit_timer_button', 'edit_privacy_button', 'turn_on', 'turn_off'), language)
+    texts = await get_texts(('edit_timer_button', 'edit_privacy_button', 'turn_on', 'turn_off'))
 
     builder.add(InlineKeyboardButton(
         text=f'{texts["edit_timer_button"]}', callback_data=f"quiz-list-edit-timer_{quiz.id}"
@@ -120,10 +115,10 @@ async def quiz_detail_edit_privacy_markup(quiz: dict, texts: dict):
     return builder.adjust(*(2,)).as_markup()
 
 
-async def test_manage_markup(part_id: int, language: str, username: str, link: str):
+async def test_manage_markup(part_id: int, username: str, link: str):
     builder = InlineKeyboardBuilder()
 
-    texts = await get_texts(('testing_start_button', 'testing_start_in_group_button', 'share_quiz_button'), language)
+    texts = await get_texts(('testing_start_button', 'testing_start_in_group_button', 'share_quiz_button'))
     builder.add(
         InlineKeyboardButton(
             text=texts['testing_start_button'],
@@ -145,8 +140,8 @@ async def test_manage_markup(part_id: int, language: str, username: str, link: s
     return builder.adjust(*(1,)).as_markup()
 
 
-async def test_start_markup(part_id: int, language: str):
-    text = await get_text('testing_ready_button', language)
+async def test_start_markup(part_id: int):
+    text = await get_text('testing_ready_button')
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [
@@ -158,8 +153,8 @@ async def test_start_markup(part_id: int, language: str):
     )
 
 
-async def test_continue_markup(language: str, ):
-    text = await get_text('testing_continue_button', language)
+async def test_continue_markup():
+    text = await get_text('testing_continue_button')
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=text, callback_data=f"testing-continue-quiz")]
@@ -167,13 +162,12 @@ async def test_continue_markup(language: str, ):
     )
 
 
-async def test_finished_markup(link: str, language: str):
+async def test_finished_markup(link: str):
     data_solo = await utils.get_data_solo()
 
     builder = InlineKeyboardBuilder()
     buttons = await get_texts(
-        ('try_again_button', 'testing_start_in_group_button', 'share_quiz_button'),
-        language
+        ('try_again_button', 'testing_start_in_group_button', 'share_quiz_button')
     )
 
     builder.add(
@@ -193,11 +187,11 @@ async def test_finished_markup(link: str, language: str):
     return builder.adjust(*(1,)).as_markup()
 
 
-async def instruction_choice_file_type_markup(language: str):
+async def instruction_choice_file_type_markup():
     builder = InlineKeyboardBuilder()
 
     data_solo = await utils.get_data_solo()
-    file_types = await get_texts(data_solo.file_types, language)
+    file_types = await get_texts(data_solo.file_types)
 
     sizes = (1, 2) if len(file_types) % 2 == 1 else (2,)
     for code, file_type in file_types.items():
@@ -224,14 +218,12 @@ async def instruction_back_markup():
 async def inline_mode_share_quiz_markup(
         start_url: str,
         start_in_group_url: str,
-        parameter: int | str,
-        language: str
+        parameter: int | str
 ):
     builder = InlineKeyboardBuilder()
 
     texts = await get_texts(
-        codes=('start_this_quiz_button', 'testing_start_in_group_button', 'share_quiz_button'),
-        language=language
+        codes=('start_this_quiz_button', 'testing_start_in_group_button', 'share_quiz_button')
     )
 
     builder.add(InlineKeyboardButton(
@@ -252,10 +244,10 @@ async def inline_mode_share_quiz_markup(
     return builder.adjust(*(1,)).as_markup()
 
 
-async def get_categories_markup(categories, language: str):
+async def get_categories_markup(categories):
     iterator = 0
     builder = InlineKeyboardBuilder()
-    texts = await get_texts([category['title'] for category in categories], language)
+    texts = await get_texts([category['title'] for category in categories])
 
     for code, value in texts.items():
         builder.add(InlineKeyboardButton(
@@ -269,7 +261,7 @@ async def get_categories_markup(categories, language: str):
     )).as_markup()
 
 
-async def categories_detail_markup(quiz_ids: list | tuple, total_pages: int, page_number: int, language: str):
+async def categories_detail_markup(quiz_ids: list | tuple, total_pages: int, page_number: int):
     builder = InlineKeyboardBuilder()
 
     for number, quiz_id in enumerate(quiz_ids, start=1):
@@ -300,7 +292,7 @@ async def categories_detail_markup(quiz_ids: list | tuple, total_pages: int, pag
     ))).as_markup()
 
 
-async def categories_quiz_parts_markup(quiz_parts, category: str, category_id: int, language: str):
+async def categories_quiz_parts_markup(quiz_parts, category: str, category_id: int):
     builder = InlineKeyboardBuilder()
 
     if len(quiz_parts) <= 10:
@@ -312,7 +304,7 @@ async def categories_quiz_parts_markup(quiz_parts, category: str, category_id: i
     else:
         sizes = (4,)
 
-    text = await get_text("questions_text", language)
+    text = await get_text("questions_text")
     for quiz_part in quiz_parts:
         builder.add(InlineKeyboardButton(
             text=f"[{quiz_part.from_i} - {quiz_part.to_i}]",
@@ -431,7 +423,7 @@ async def admin_pending_message_markup(ids: list):
 
 
 async def group_ready_markup(group_id: str):
-    text = texts.testing_ready_button
+    text = await get_text('testing_ready_button')
 
     return InlineKeyboardMarkup(
         inline_keyboard=[
@@ -446,15 +438,10 @@ async def group_ready_markup(group_id: str):
 
 
 async def test_group_continue_markup(group_id: str, index: int):
-    text = texts.testing_continue_button
+    text = await get_text('testing_continue_button')
     return InlineKeyboardMarkup(
         inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=text,
-                    callback_data=f"testing-group-continue-quiz_{group_id}_{index}"
-                )
-            ]
+            [InlineKeyboardButton(text=text, callback_data=f"testing-group-continue-quiz_{group_id}_{index}")]
         ]
     )
 

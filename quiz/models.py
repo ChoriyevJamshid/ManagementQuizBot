@@ -35,11 +35,6 @@ class Quiz(BaseModel):
         null=True,
         related_name="quizzes"
     )
-    allowed_users = models.JSONField(
-        default=list,
-        blank=True,
-        null=True
-    )
 
     title = models.CharField(max_length=127)
     file_id = models.CharField(max_length=255)
@@ -49,11 +44,6 @@ class Quiz(BaseModel):
     privacy = models.BooleanField(default=True)
 
     objects = models.Manager()
-
-    def save(self, *args, **kwargs):
-        if not self.allowed_users:
-            self.allowed_users = []
-        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.title
@@ -138,31 +128,12 @@ class UserQuiz(BaseModel):
 
 
 class GroupQuiz(BaseModel):
-    part = models.ForeignKey(
-        QuizPart,
-        on_delete=models.CASCADE,
-        related_name="group_quizzes"
-    )
-    user = models.ForeignKey(
-        "common.TelegramProfile",
-        on_delete=models.CASCADE,
-        related_name="group_quizzes"
-    )
+    part = models.ForeignKey(QuizPart, on_delete=models.CASCADE, related_name="group_quizzes")
+    user = models.ForeignKey("common.TelegramProfile", on_delete=models.CASCADE, related_name="group_quizzes")
 
-    title = models.CharField(
-        max_length=127,
-        blank=True,
-        null=True
-    )
-    language = models.CharField(
-        max_length=7,
-        blank=True,
-        null=True
-    )
-    invite_link = models.URLField(
-        blank=True,
-        null=True
-    )
+    title = models.CharField(max_length=127, blank=True, null=True)
+    invite_link = models.URLField(blank=True, null=True)
+
     group_id = models.CharField(max_length=63)
     message_id = models.CharField(max_length=255)
     poll_id = models.CharField(max_length=255)
@@ -173,20 +144,9 @@ class GroupQuiz(BaseModel):
     answers = models.PositiveSmallIntegerField(default=0)
     participant_count = models.PositiveSmallIntegerField(default=0)
 
-    file = models.FileField(
-        upload_to="quiz/%Y/%m/%d",
-        blank=True,
-        null=True
-    )
-    status = models.CharField(
-        max_length=31,
-        choices=QuizStatus.choices,
-        default=QuizStatus.INIT
-    )
-    data = models.JSONField(
-        blank=True,
-        null=True
-    )
+    file = models.FileField(upload_to="quiz/%Y/%m/%d", blank=True, null=True)
+    status = models.CharField(max_length=31, choices=QuizStatus.choices, default=QuizStatus.INIT)
+    data = models.JSONField(blank=True, null=True)
 
     objects = models.Manager()
 

@@ -9,7 +9,6 @@ from bot.utils.functions import get_text, get_texts
 
 # async def share_inline_query(query: types.InlineQuery):
 #     user = await get_user(query.from_user)
-#     language = user.language if user.language else 'en'
 #
 #     result = types.InlineQueryResultArticle(
 #         id=query.id,
@@ -33,7 +32,6 @@ from bot.utils.functions import get_text, get_texts
 
 async def testing_inline_query(query: types.InlineQuery):
     user = await utils.get_user(query.from_user)
-    language = user.language if user.language else 'en'
 
     parameter = query.query.split('_')[-1]
     if parameter.isdigit():
@@ -47,7 +45,7 @@ async def testing_inline_query(query: types.InlineQuery):
     quantity = quiz_part.quantity
     timer = quiz_part.quiz.timer
 
-    text = await get_text("inline_mode_share_quiz", language, {
+    text = await get_text("inline_mode_share_quiz", {
         "title": title,
         "quantity": str(quantity),
         "timer": str(timer),
@@ -56,8 +54,7 @@ async def testing_inline_query(query: types.InlineQuery):
     markup = await inline_kb.inline_mode_share_quiz_markup(
         start_url=f"https://t.me/{data_solo.username}?start={quiz_part.link}",
         start_in_group_url=f"https://t.me/{data_solo.username}?startgroup={quiz_part.link}",
-        parameter=parameter,
-        language=language,
+        parameter=parameter
     )
 
     result = types.InlineQueryResultArticle(

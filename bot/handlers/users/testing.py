@@ -13,8 +13,24 @@ from bot.utils.functions import (
     generate_user_quiz_data,
     testing_animation
 )
-from bot.handlers.groups.common import check_quiz_part_owner
-from bot.utils import texts
+from bot.handlers.groups.common import check_user_role
+import uuid
+
+async def wait_and_check_skip(task_id: str, timer: int, user, bot: Bot, state: FSMContext):
+    await asyncio.sleep(timer + 2)
+    data = await state.get_data()
+    current_user_quiz = data.get('current_user_quiz', {})
+
+    if not current_user_quiz:
+        return
+
+    # If the user answered the poll, the handler will have changed the task_id 
+    # for the next question. If task_ids differ, this sleep is obsolete!
+    if current_user_quiz.get('question_task_id') != task_id:
+        return
+
+    await testing_send_skipped_question_function(user, bot, state)
+
 
 
 async def testing_stop_quiz_handler(message: types.Message, state: FSMContext):
@@ -23,10 +39,9 @@ async def testing_stop_quiz_handler(message: types.Message, state: FSMContext):
 
     user = await utils.get_user(message.from_user)
     user_quiz = await utils.get_user_active_quiz(user.id)
-    language = user.language if user.language else "en"
 
     if not user_quiz:
-        text = await get_text("testing_not_active_quiz", language)
+        text = await get_text("testing_not_active_quiz")
         await message.answer(text)
         return await state.clear()
 
@@ -42,12 +57,12 @@ async def testing_stop_quiz_handler(message: types.Message, state: FSMContext):
         user_quiz.save(update_fields=['status', 'active'])
         await state.set_state(QuizState.finished)
 
-        text = await get_text("please_press_start", language)
+        text = await get_text("please_press_start")
         return message.answer(text)
 
-    markup = await inline_kb.test_finished_markup(user_quiz.part.link, language)
+    markup = await inline_kb.test_finished_markup(user_quiz.part.link)
     text = await get_text_with_or_without_minute(
-        minutes, seconds, user_quiz.part.quiz.title, user_quiz.part.quantity, current_user_quiz, language)
+        minutes, seconds, user_quiz.part.quiz.title, user_quiz.part.quantity, current_user_quiz)
 
     await message.answer(text=text, reply_markup=markup)
     await state.set_state(QuizState.finished)
@@ -56,12 +71,11 @@ async def testing_stop_quiz_handler(message: types.Message, state: FSMContext):
 
 async def testing_link_handler(message: types.Message, state: FSMContext):
     user = await utils.get_user(message.from_user)
-    language = user.language if user.language else 'en'
     data_solo = await utils.get_data_solo()
 
     title = await utils.get_exists_user_active_quiz(user.id)
     if title is not None:
-        text = await get_text("testing_quiz_active_not_stopped", language, {
+        text = await get_text("testing_quiz_active_not_stopped", {
             "title": title
         })
         return await message.answer(text)
@@ -82,16 +96,15 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
         pass
 
     if not quiz_part:
-        text = await get_text('testing_quiz_part_not_found', language)
+        text = await get_text('testing_quiz_part_not_found')
         return await message.answer(text)
 
-    is_owner = await check_quiz_part_owner(
-        quiz_part=quiz_part,
+    is_allowed = await check_user_role(
         user=user,
-        message=message
+        message=message,
     )
 
-    if not is_owner:
+    if not is_allowed:
         return None
 
 
@@ -100,7 +113,7 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
     players_count = await utils.get_user_quizzes_count(quiz_part.id)
     if players_count == 0:
         text = await get_text(
-            'testing_quiz_part_info_not_answered', language,
+            'testing_quiz_part_info_not_answered',
             {
                 "from_i": str(quiz_part.from_i),
                 "to_i": str(quiz_part.to_i),
@@ -111,7 +124,7 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
         )
     else:
         text = await get_text(
-            'testing_quiz_part_info_answered', language,
+            'testing_quiz_part_info_answered',
             {
                 "from_i": str(quiz_part.from_i),
                 "to_i": str(quiz_part.to_i),
@@ -121,9 +134,8 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
                 "users": str(players_count)
             }
         )
-    markup = await inline_kb.   test_manage_markup(
+    markup = await inline_kb.test_manage_markup(
         part_id=quiz_part.id,
-        language=language,
         username=data_solo.username,
         link=quiz_part.link
     )
@@ -133,11 +145,10 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
 
 async def testing_start_pressed_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     title = await utils.get_exists_user_active_quiz(user.id)
     if title is not None:
-        text = await get_text("testing_quiz_active_not_stopped", language, {
+        text = await get_text("testing_quiz_active_not_stopped", {
             "title": title
         })
         await callback.message.answer(text)
@@ -147,7 +158,7 @@ async def testing_start_pressed_handler(callback: types.CallbackQuery, state: FS
     quiz_part = await utils.get_quiz_part_by_id(part_id)
 
     text = await get_text(
-        'testing_quiz_part_ready_info', language,
+        'testing_quiz_part_ready_info',
         {
             "from_i": str(quiz_part.from_i),
             "to_i": str(quiz_part.to_i),
@@ -156,7 +167,7 @@ async def testing_start_pressed_handler(callback: types.CallbackQuery, state: FS
             "title": str(quiz_part.quiz.title),
         }
     )
-    markup = await inline_kb.test_start_markup(part_id, language)
+    markup = await inline_kb.test_start_markup(part_id)
     await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
 
@@ -165,11 +176,10 @@ async def testing_ready_pressed_handler(callback: types.CallbackQuery, state: FS
     await state.update_data(ready_message_id=None)
 
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     title = await utils.get_exists_user_active_quiz(user.id)
     if title is not None:
-        text = await get_text("testing_quiz_active_not_stopped", language, {
+        text = await get_text("testing_quiz_active_not_stopped", {
             "title": title
         })
         return await callback.answer(text)
@@ -181,15 +191,20 @@ async def testing_ready_pressed_handler(callback: types.CallbackQuery, state: FS
 
     user_quiz.data = question_data
     user_quiz.save(update_fields=['data'])
+    
+    # Do not clear current_data from DB anymore as we only rely on Redis.
+    user_quiz.current_data = {}
+    user_quiz.save(update_fields=['current_data'])
 
     index = 0
-    poll_question = await get_text('poll_question', language)
+    poll_question = await get_text('poll_question')
     question_text = (f"<b>{index + 1}. {question_data[index]['question']}</b>\n\n"
                      f"<b>A)</b> <i>{question_data[index]['options'][0]}</i>\n"
                      f"<b>B)</b> <i>{question_data[index]['options'][1]}</i>\n"
                      f"<b>C)</b> <i>{question_data[index]['options'][2]}</i>\n"
                      f"<b>D)</b> <i>{question_data[index]['options'][3]}</i>\n")
     correct_option_id = question_data[index]['options'].index(question_data[index]['correct_option'])
+    task_id = str(uuid.uuid4())
     current_user_quiz = {
         'id': user_quiz.id,
         'title': user_quiz.part.quiz.title,
@@ -199,9 +214,10 @@ async def testing_ready_pressed_handler(callback: types.CallbackQuery, state: FS
         "wrongs": 0,
         "skips": 0,
         "times": 0,
+        "question_task_id": task_id
     }
 
-    await testing_animation(callback, language)
+    await testing_animation(callback)
 
     user_quiz = await utils.get_user_active_quiz(user.id)
     if not user_quiz:
@@ -221,23 +237,16 @@ async def testing_ready_pressed_handler(callback: types.CallbackQuery, state: FS
         protect_content=True
     )
     await state.set_state(QuizState.testing)
-    await asyncio.sleep(part.quiz.timer + 2)
-
-    data = await state.get_data()
-    current_user_quiz = data.get('current_user_quiz', {})
-
-    if not current_user_quiz:
-        return
-
-    user_quiz_id = int(current_user_quiz.get('id', 0))
-    if user_quiz_id != user_quiz.id:
-        return
-
-    new_index = int(current_user_quiz.get('index', 0))
-    if new_index > index:
-        return
-
-    await testing_send_skipped_question_function(user, callback.bot, state)
+    
+    asyncio.create_task(
+        wait_and_check_skip(
+            task_id=task_id,
+            timer=part.quiz.timer,
+            user=user,
+            bot=callback.bot,
+            state=state
+        )
+    )
 
 
 async def testing_poll_answer_handler(poll_answer: types.PollAnswer, state: FSMContext):
@@ -245,7 +254,6 @@ async def testing_poll_answer_handler(poll_answer: types.PollAnswer, state: FSMC
     end_time = time.perf_counter()
     data = await state.get_data()
     user = await utils.get_user(poll_answer.user)
-    language = user.language if user.language else 'en'
 
     current_user_quiz = data.get('current_user_quiz', {})
 
@@ -271,7 +279,7 @@ async def testing_poll_answer_handler(poll_answer: types.PollAnswer, state: FSMC
 
     if index < user_quiz.part.quantity:
 
-        poll_question = await get_text('poll_question', language)
+        poll_question = await get_text('poll_question')
         question_text = (f"<b>{index + 1}. {question_data[index]['question']}</b>\n\n"
                          f"<b>A)</b> <i>{question_data[index]['options'][0]}</i>\n"
                          f"<b>B)</b> <i>{question_data[index]['options'][1]}</i>\n"
@@ -281,6 +289,9 @@ async def testing_poll_answer_handler(poll_answer: types.PollAnswer, state: FSMC
         current_user_quiz['index'] = index
         current_user_quiz['correct_option_id'] = correct_option_id
         current_user_quiz['start_time'] = time.perf_counter()
+        
+        task_id = str(uuid.uuid4())
+        current_user_quiz['question_task_id'] = task_id
 
         await state.update_data(current_user_quiz=current_user_quiz)
         await poll_answer.bot.send_message(
@@ -297,23 +308,16 @@ async def testing_poll_answer_handler(poll_answer: types.PollAnswer, state: FSMC
             open_period=user_quiz.part.quiz.timer,
             protect_content=True
         )
-        await asyncio.sleep(user_quiz.part.quiz.timer + 2)
-
-        data = await state.get_data()
-        current_user_quiz = data.get('current_user_quiz', {})
-
-        if not current_user_quiz:
-            return
-
-        user_quiz_id = int(current_user_quiz.get('id', 0))
-        if user_quiz_id != user_quiz.id:
-            return
-
-        new_index = int(current_user_quiz.get('index', 0))
-        if new_index > index:
-            return
-
-        await testing_send_skipped_question_function(user, poll_answer.bot, state)
+        
+        asyncio.create_task(
+            wait_and_check_skip(
+                task_id=task_id,
+                timer=user_quiz.part.quiz.timer,
+                user=user,
+                bot=poll_answer.bot,
+                state=state
+            )
+        )
 
     else:
         await state.update_data(current_user_quiz=None)
@@ -321,9 +325,9 @@ async def testing_poll_answer_handler(poll_answer: types.PollAnswer, state: FSMC
         times = current_user_quiz.get('times', 0)
         minutes, seconds = times // 60, times % 60
 
-        markup = await inline_kb.test_finished_markup(user_quiz.part.link, language)
+        markup = await inline_kb.test_finished_markup(user_quiz.part.link)
         text = await get_text_with_or_without_minute(
-            minutes, seconds, user_quiz.part.quiz.title, user_quiz.part.quantity, current_user_quiz, language)
+            minutes, seconds, user_quiz.part.quiz.title, user_quiz.part.quantity, current_user_quiz)
 
         await poll_answer.bot.send_message(
             chat_id=poll_answer.user.id,
@@ -337,7 +341,6 @@ async def testing_poll_answer_handler(poll_answer: types.PollAnswer, state: FSMC
 async def testing_continue_quiz_handler(callback: types.CallbackQuery, state: FSMContext):
 
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     user_quiz = await utils.get_user_active_quiz(user.id)
 
@@ -350,7 +353,7 @@ async def testing_continue_quiz_handler(callback: types.CallbackQuery, state: FS
     index = int(current_user_quiz.get('index', 0)) + 1
     if index < user_quiz.part.quantity:
 
-        poll_question = await get_text('poll_question', language)
+        poll_question = await get_text('poll_question')
         question_text = (f"<b>{index + 1}. {question_data[index]['question']}</b>\n\n"
                          f"<b>A)</b> <i>{question_data[index]['options'][0]}</i>\n"
                          f"<b>B)</b> <i>{question_data[index]['options'][1]}</i>\n"
@@ -360,6 +363,9 @@ async def testing_continue_quiz_handler(callback: types.CallbackQuery, state: FS
         current_user_quiz['index'] = index
         current_user_quiz['correct_option_id'] = correct_option_id
         current_user_quiz['start_time'] = time.perf_counter()
+        
+        task_id = str(uuid.uuid4())
+        current_user_quiz['question_task_id'] = task_id
 
         await callback.message.delete_reply_markup()
         await state.update_data(current_user_quiz=current_user_quiz)
@@ -374,23 +380,15 @@ async def testing_continue_quiz_handler(callback: types.CallbackQuery, state: FS
             protect_content=True
         )
 
-        await asyncio.sleep(user_quiz.part.quiz.timer + 2)
-
-        data = await state.get_data()
-        current_user_quiz = data.get('current_user_quiz', {})
-
-        if not current_user_quiz:
-            return
-
-        user_quiz_id = int(current_user_quiz.get('id', 0))
-        if user_quiz_id != user_quiz.id:
-            return
-
-        new_index = int(current_user_quiz.get('index', 0))
-        if new_index > index:
-            return
-
-        await testing_send_skipped_question_function(user, callback.bot, state)
+        asyncio.create_task(
+            wait_and_check_skip(
+                task_id=task_id,
+                timer=user_quiz.part.quiz.timer,
+                user=user,
+                bot=callback.bot,
+                state=state
+            )
+        )
 
     else:
         await state.update_data(current_user_quiz=None)
@@ -398,9 +396,9 @@ async def testing_continue_quiz_handler(callback: types.CallbackQuery, state: FS
         times = current_user_quiz.get('times', 0)
         minutes, seconds = times // 60, times % 60
 
-        markup = await inline_kb.test_finished_markup(user_quiz.part.link, language)
+        markup = await inline_kb.test_finished_markup(user_quiz.part.link)
         text = await get_text_with_or_without_minute(
-            minutes, seconds, user_quiz.part.quiz.title, user_quiz.part.quantity, current_user_quiz, language)
+            minutes, seconds, user_quiz.part.quiz.title, user_quiz.part.quantity, current_user_quiz)
 
         await callback.message.answer(text=text, reply_markup=markup)
         await state.set_state(QuizState.finished)
@@ -411,11 +409,10 @@ async def testing_try_retry_handler(callback: types.CallbackQuery, state: FSMCon
     await callback.answer()
     data = await state.get_data()
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     title = await utils.get_exists_user_active_quiz(user.id)
     if title is not None:
-        text = await get_text("testing_quiz_active_not_stopped", language, {
+        text = await get_text("testing_quiz_active_not_stopped", {
             "title": title
         })
         await callback.message.answer(text)
@@ -425,31 +422,22 @@ async def testing_try_retry_handler(callback: types.CallbackQuery, state: FSMCon
     quiz_part = await utils.get_quiz_part(link)
 
     if not quiz_part:
-        text = await get_text('testing_quiz_part_not_found', language)
+        text = await get_text('testing_quiz_part_not_found')
         await callback.message.answer(text)
         return
 
-    if quiz_part.quiz.owner_id != user.id and quiz_part.privacy is False:
-        text = await get_text(
-            'testing_quiz_part_not_allowed_by_owner', language,
-            {
-                'title': quiz_part.quiz.title,
-                'owner': quiz_part.quiz.owner.username \
-                    if quiz_part.quiz.owner.username \
-                    else quiz_part.quiz.owner.first_name,
-                "from_i": str(quiz_part.from_i),
-                "to_i": str(quiz_part.to_i),
-                "quantity": str(quiz_part.quantity),
-                "timer": str(quiz_part.quiz.timer),
-            }
-        )
-        return await callback.message.answer(text)
+    is_allowed = await check_user_role(
+        user=user,
+        message=callback.message,
+    )
+    if not is_allowed:
+        return
 
     players_count = await utils.get_user_quizzes_count(quiz_part.id)
 
     if players_count == 0:
         text = await get_text(
-            'testing_quiz_part_info_not_answered', language,
+            'testing_quiz_part_info_not_answered',
             {
                 "from_i": str(quiz_part.from_i),
                 "to_i": str(quiz_part.to_i),
@@ -460,7 +448,7 @@ async def testing_try_retry_handler(callback: types.CallbackQuery, state: FSMCon
         )
     else:
         text = await get_text(
-            'testing_quiz_part_info_answered', language,
+            'testing_quiz_part_info_answered',
             {
                 "from_i": str(quiz_part.from_i),
                 "to_i": str(quiz_part.to_i),
@@ -478,14 +466,13 @@ async def testing_try_retry_handler(callback: types.CallbackQuery, state: FSMCon
             message_id=data['ready_message_id'],
             reply_markup=None
         )
-    markup = await inline_kb.test_start_markup(quiz_part.id, language)
+    markup = await inline_kb.test_start_markup(quiz_part.id)
     message = await callback.message.answer(text, reply_markup=markup)
     await state.update_data(ready_message_id=message.message_id)
 
 
 async def testing_send_skipped_question_function(user, bot: Bot, state: FSMContext):
     data = await state.get_data()
-    language = user.language if user.language else 'en'
     current_user_quiz = data.get('current_user_quiz', {})
     index = int(current_user_quiz.get('index', 0)) + 1
 
@@ -501,8 +488,8 @@ async def testing_send_skipped_question_function(user, bot: Bot, state: FSMConte
     if index < user_quiz.part.quantity:
 
         if current_user_quiz["skips"] % 2 == 0:
-            text = await get_text("testing_user_stops_answering", language)
-            markup = await inline_kb.test_continue_markup(language)
+            text = await get_text("testing_user_stops_answering")
+            markup = await inline_kb.test_continue_markup()
             user_quiz.current_data = current_user_quiz
             user_quiz.save(update_fields=['current_data'])
 
@@ -515,7 +502,7 @@ async def testing_send_skipped_question_function(user, bot: Bot, state: FSMConte
             await state.set_state(QuizState.testing)
             return
 
-        poll_question = await get_text('poll_question', language)
+        poll_question = await get_text('poll_question')
         question_text = (f"<b>{index + 1}. {question_data[index]['question']}</b>\n\n"
                          f"<b>A)</b> <i>{question_data[index]['options'][0]}</i>\n"
                          f"<b>B)</b> <i>{question_data[index]['options'][1]}</i>\n"
@@ -525,6 +512,9 @@ async def testing_send_skipped_question_function(user, bot: Bot, state: FSMConte
         current_user_quiz['index'] = index
         current_user_quiz['correct_option_id'] = correct_option_id
         current_user_quiz['start_time'] = time.perf_counter()
+        
+        task_id = str(uuid.uuid4())
+        current_user_quiz['question_task_id'] = task_id
 
         await state.update_data(current_user_quiz=current_user_quiz)
         await bot.send_message(
@@ -542,23 +532,15 @@ async def testing_send_skipped_question_function(user, bot: Bot, state: FSMConte
             protect_content=True
         )
 
-        await asyncio.sleep(user_quiz.part.quiz.timer + 2)
-
-        data = await state.get_data()
-        current_user_quiz = data.get('current_user_quiz', {})
-
-        if not current_user_quiz:
-            return
-
-        user_quiz_id = int(current_user_quiz.get('id', 0))
-        if user_quiz_id != user_quiz.id:
-            return
-
-        new_index = int(current_user_quiz.get('index', 0))
-        if new_index > index:
-            return
-
-        await testing_send_skipped_question_function(user, bot, state)
+        asyncio.create_task(
+            wait_and_check_skip(
+                task_id=task_id,
+                timer=user_quiz.part.quiz.timer,
+                user=user,
+                bot=bot,
+                state=state
+            )
+        )
 
     else:
         await state.update_data(current_user_quiz=None)
@@ -566,9 +548,9 @@ async def testing_send_skipped_question_function(user, bot: Bot, state: FSMConte
         times = current_user_quiz.get('times', 0)
         minutes, seconds = times // 60, times % 60
 
-        markup = await inline_kb.test_finished_markup(user_quiz.part.link, language)
+        markup = await inline_kb.test_finished_markup(user_quiz.part.link)
         text = await get_text_with_or_without_minute(
-            minutes, seconds, user_quiz.part.quiz.title, user_quiz.part.quantity, current_user_quiz, language)
+            minutes, seconds, user_quiz.part.quiz.title, user_quiz.part.quantity, current_user_quiz)
         await bot.send_message(
             chat_id=user.chat_id,
             text=text,
@@ -595,12 +577,11 @@ async def get_text_with_or_without_minute(
         seconds: int,
         title: str,
         quantity: int,
-        current_user_quiz,
-        language
+        current_user_quiz
 ):
     qnt = current_user_quiz.get('corrects', 0) + current_user_quiz.get('wrongs', 0) + current_user_quiz.get('skips', 0)
     if minutes > 0:
-        text = await get_text("testing_user_finished_quiz_with_minute", language, parameters={
+        text = await get_text("testing_user_finished_quiz_with_minute", parameters={
             "title": title,
             "quantity": str(qnt),
             "corrects": str(current_user_quiz['corrects']),
@@ -610,7 +591,7 @@ async def get_text_with_or_without_minute(
             "minutes": str(minutes),
         })
     else:
-        text = await get_text("testing_user_finished_quiz_without_minute", language, parameters={
+        text = await get_text("testing_user_finished_quiz_without_minute", parameters={
             "title": title,
             "quantity": str(qnt),
             "corrects": str(current_user_quiz['corrects']),

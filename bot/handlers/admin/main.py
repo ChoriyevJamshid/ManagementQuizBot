@@ -15,7 +15,6 @@ from bot.utils.functions import get_text, get_texts
 async def admin_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     user = await utils.get_user(message.chat)
-    language = user.language if user.language else 'en'
     message_id = data.get('markup_message_id', None)
 
     if user.role == Role.USER:
@@ -35,7 +34,7 @@ async def admin_handler(message: types.Message, state: FSMContext):
         'admin_user_count_button',
         'admin_support_messages_count_button',
         'admin_support_pending_messages_button',
-    ), language)
+    ))
 
     markup = await inline_kb.admin_menu_markup(texts)
 
@@ -57,28 +56,26 @@ async def admin_handler(message: types.Message, state: FSMContext):
 async def admin_user_count_callback(callback: types.CallbackQuery, state: FSMContext):
 
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     if user.role == Role.USER:
         await callback.answer()
         return await callback.message.delete()
 
     users_number = await utils.get_users_count()
-    text = await get_text('admin_users_count_text', language, {'count': str(users_number)})
+    text = await get_text('admin_users_count_text', {'count': str(users_number)})
 
     return await callback.answer(text, show_alert=True)
 
 
 async def admin_support_messages_count_callback(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     if user.role == Role.USER:
         await callback.answer()
         return await callback.message.delete()
 
     messages_counts = await utils.get_support_messages_count()
-    text = await get_text('admin_support_messages_count_text', language, {
+    text = await get_text('admin_support_messages_count_text', {
         'all': str(messages_counts.get('all', 0)),
         'pending': str(messages_counts.get('pending', 0)),
         'resolved': str(messages_counts.get('resolved', 0)),
@@ -90,7 +87,6 @@ async def admin_support_messages_count_callback(callback: types.CallbackQuery, s
 
 async def admin_support_pending_messages_callback(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     if user.role == Role.USER:
         await callback.answer()
@@ -99,7 +95,7 @@ async def admin_support_pending_messages_callback(callback: types.CallbackQuery,
     pending_messages = await utils.get_pending_messages()
 
     if not pending_messages:
-        text = await get_text('admin_support_not_pending_messages_text', language)
+        text = await get_text('admin_support_not_pending_messages_text')
         return await callback.answer(text, show_alert=True)
 
     text = str()
@@ -117,14 +113,13 @@ async def admin_support_pending_messages_callback(callback: types.CallbackQuery,
 async def admin_pending_message_callback(callback: types.CallbackQuery, state: FSMContext):
     try:
         user = await utils.get_user(callback.from_user)
-        language = user.language if user.language else 'en'
 
         if user.role == Role.USER:
             await callback.answer()
             return await callback.message.delete()
 
         pending_id = callback.data.split('_')[-1]
-        text = await get_text('admin_answer_to_pending_message_text', language)
+        text = await get_text('admin_answer_to_pending_message_text')
         markup = await reply_kb.back_to_pending_messaged_markup()
 
 
@@ -143,10 +138,9 @@ async def admin_pending_message_callback(callback: types.CallbackQuery, state: F
 async def get_admin_answer_to_pending_message_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     user = await utils.get_user(message.chat)
-    language = user.language if user.language else 'en'
 
     if message.content_type != types.ContentType.TEXT:
-        text = await get_text('admin_answer_to_pending_message_text', language)
+        text = await get_text('admin_answer_to_pending_message_text')
         markup = await reply_kb.back_to_pending_messaged_markup()
         return await message.answer(text, reply_markup=markup)
 
@@ -155,13 +149,13 @@ async def get_admin_answer_to_pending_message_handler(message: types.Message, st
         pending_messages = await utils.get_pending_messages()
 
         if not pending_messages:
-            text = await get_text('admin_support_not_pending_messages_text', language)
+            text = await get_text('admin_support_not_pending_messages_text')
             texts = await get_texts((
                 'admin_menu',
                 'admin_user_count_button',
                 'admin_support_messages_count_button',
                 'admin_support_pending_messages_button',
-            ), language)
+            ))
 
             markup = await inline_kb.admin_menu_markup(texts)
             await state.update_data(markup_message_id=message.message_id + 1)
@@ -175,17 +169,17 @@ async def get_admin_answer_to_pending_message_handler(message: types.Message, st
         'admin_user_count_button',
         'admin_support_messages_count_button',
         'admin_support_pending_messages_button',
-    ), language)
+    ))
     markup = await inline_kb.admin_menu_markup(texts)
 
     if not pending_message:
-        text = await get_text('admin_support_not_pending_messages_text', language)
+        text = await get_text('admin_support_not_pending_messages_text')
         return await message.answer(text, reply_markup=markup)
 
     pending_message.answer = message.text
     pending_message.status = 'resolved'
 
-    text = await get_text('admin_answer_to_pending_message_success_text', language)
+    text = await get_text('admin_answer_to_pending_message_success_text')
     await message.answer(text, reply_markup=markup)
     await state.clear()
     await state.update_data(markup_message_id=message.message_id + 1)
@@ -194,7 +188,6 @@ async def get_admin_answer_to_pending_message_handler(message: types.Message, st
 
 async def admin_back_admin_menu_callback(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else 'en'
 
     if user.role == Role.USER:
         await callback.answer()
@@ -205,7 +198,7 @@ async def admin_back_admin_menu_callback(callback: types.CallbackQuery, state: F
         'admin_user_count_button',
         'admin_support_messages_count_button',
         'admin_support_pending_messages_button',
-    ), language)
+    ))
 
     markup = await inline_kb.admin_menu_markup(texts)
     await state.update_data(markup_message_id=callback.message.message_id)

@@ -15,8 +15,11 @@ SECRET_KEY = env.str("SECRET_KEY")
 DEBUG = env.bool("DEBUG")
 API_TOKEN = env.str("API_TOKEN")
 ADMIN = env.str("ADMIN")
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS")
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", 
+    default=["5cd6-45-153-61-230.ngrok-free.app", "localhost", "127.0.0.1", "0.0.0.0"])
 WEB_DOMAIN = env.str("WEB_DOMAIN")
+
+print(f"ALLOWED_HOSTS: {ALLOWED_HOSTS}")
 
 WEBHOOK_PATH = 'bot/' + hashlib.md5(API_TOKEN.encode()).hexdigest()
 WEBHOOK_URL = f"{WEB_DOMAIN}/{WEBHOOK_PATH}"
@@ -41,7 +44,6 @@ INSTALLED_APPS = [
     # LOCAL
     'common.apps.CommonConfig',
     'support.apps.SupportConfig',
-    'adservice.apps.AdserviceConfig',
     'quiz.apps.QuizConfig',
 
 ]
@@ -205,9 +207,7 @@ CKEDITOR_CONFIGS = {
 
 CKEDITOR_UPLOAD_PATH = "uploads/"
 CKEDITOR_RESTRICT_BY_USER = True
-CSRF_TRUSTED_ORIGINS = [
-    env.str("WEB_DOMAIN")
-]
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 INTERNAL_IPS = ["127.0.0.1"]
 

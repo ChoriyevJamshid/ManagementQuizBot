@@ -16,23 +16,15 @@ python manage.py migrate --noinput
 echo "🧼 Сборка статики..."
 python manage.py collectstatic --noinput
 
-if ["$WITH_BOT" = true]; then
-  echo "❌ Удаление Webhook (запущен with-bot)..."
-  python manage.py deletewebhook
-else
+# if [ "$WITH_BOT" = "true" ]; then
+  # echo "❌ Удаление Webhook (запущен with-bot)..."
+  # python manage.py deletewebhook
+# else
   echo "✅ Установка Webhook (бот не активен)..."
   python manage.py setwebhook
-fi
+# fi
 
 echo "🚀 Запуск Gunicorn..."
 exec gunicorn src.asgi:application \
     --worker-class=uvicorn.workers.UvicornWorker \
-    --workers=4 \
-    --threads=1 \
-    --worker-connections=1000 \
-    --bind 0.0.0.0:$WEB_PORT \
-    --keep-alive=65 \
-    --timeout=30 \
-    --graceful-timeout=30 \
-    --max-requests=10000 \
-    --max-requests-jitter=500
+    --bind 0.0.0.0:$WEB_PORT
