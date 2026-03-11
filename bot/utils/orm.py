@@ -225,6 +225,13 @@ async def update_group_quiz(group_quiz):
     ).aupdate(status=QuizStatus.STARTED)
 
 
+async def update_group_quiz_is_answer(group_quiz_id):
+    return await GroupQuiz.objects.filter(
+        pk=group_quiz_id,
+        is_answered=False
+    ).aupdate(is_answered=True)
+
+
 async def add_or_check_chat(chat_id: int):
     data_obj = com_models.Data.get_solo()
     data_obj.channel_id = chat_id

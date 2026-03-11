@@ -83,7 +83,7 @@ async def run_group_quiz_loop(
             return
 
         # Проверяем был ли ответ на предыдущий вопрос
-        if index != 0 and not group_quiz.is_answered:
+        if index > 0 and not group_quiz.is_answered:
             group_quiz.skips += 1
             await group_quiz.asave(update_fields=["skips"])
 
@@ -94,8 +94,8 @@ async def run_group_quiz_loop(
 
         # Проверка на два пропуска
         if group_quiz.skips >= 2:
-            await handle_no_answers(group_quiz, index, bot)
-            return
+            return await handle_no_answers(group_quiz, index, bot)
+
 
         await send_question(
             group_quiz=group_quiz,
@@ -227,6 +227,7 @@ async def group_quiz_continue_callback(
 
 async def testing_group_poll_answer_handler(poll_answer: types.PollAnswer):
 
+    print(f"WORKING testing group poll answer handler")
     try:
         end_time = time.perf_counter()
 
@@ -235,13 +236,18 @@ async def testing_group_poll_answer_handler(poll_answer: types.PollAnswer):
         # -----------------------------
         quiz_id = await redis_client.get(f"poll:{poll_answer.poll_id}")
 
+        print(f"\n{quiz_id = }\n")
+
         if not quiz_id:
             raise SkipHandler()
+
+        await utils.update_group_quiz_is_answer(quiz_id)
 
         # -----------------------------
         # GET QUESTION DATA
         # -----------------------------
         q_data = await redis_group.get_group_question_data(quiz_id)
+        print(f"\n{q_data = }\n")
 
         correct_option_id = q_data["correct_option_id"]
         start_time = q_data["start_time"]
@@ -259,6 +265,7 @@ async def testing_group_poll_answer_handler(poll_answer: types.PollAnswer):
             if poll_answer.user.username
             else poll_answer.user.first_name
         )
+        print(f"\n{username = }\n")
 
         # -----------------------------
         # CHECK ANSWER
@@ -267,9 +274,9 @@ async def testing_group_poll_answer_handler(poll_answer: types.PollAnswer):
             len(poll_answer.option_ids) > 0
             and poll_answer.option_ids[0] == correct_option_id
         )
-
+        print(f"\n{is_correct = }\n")
         spent_time = round(end_time - start_time, 2) if start_time else 0.0
-
+        print(f"\n{spent_time = }\n")
         # -----------------------------
         # UPDATE REDIS SCORE
         # -----------------------------
