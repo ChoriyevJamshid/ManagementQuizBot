@@ -6,6 +6,7 @@ from aiogram import types
 from common import models as com_models
 from quiz import models as quiz_models
 from quiz.choices import QuizStatus
+from quiz.models import GroupQuiz
 from support import models as support_models
 from support.choices import SupportMessageStatus
 
@@ -65,6 +66,7 @@ async def get_category_by_iterator(iterator: int):
     except Exception as e:
         return None
 
+
 async def get_category_by_params(_id: int | str, title: str):
     return await quiz_models.Category.objects.filter(id=_id, title=title).values_list(
         'id', flat=True
@@ -101,7 +103,12 @@ async def get_quiz_parts(quiz_id: int):
 
 
 async def get_quiz_part(link: str):
-    return await quiz_models.QuizPart.objects.filter(link=link).select_related("quiz", "quiz__owner").afirst()
+    return await (
+        quiz_models.QuizPart.objects
+        .filter(link=link)
+        .select_related("quiz", "quiz__owner")
+        .afirst()
+    )
 
 
 async def get_exists_user_active_quiz(user_id: int):
@@ -167,7 +174,7 @@ async def get_pending_messages():
 # queries for group
 
 async def exists_quiz_part(link: str):
-    return quiz_models.QuizPart.objects.filter(link=link).exists()
+    return await quiz_models.QuizPart.objects.filter(link=link).aexists()
 
 
 async def get_group_quiz(group_id: str) -> quiz_models.GroupQuiz | None:
@@ -210,6 +217,14 @@ async def create_group_quiz(
         invite_link=invite_link,
     )
 
+
+async def update_group_quiz(group_quiz):
+    await GroupQuiz.objects.filter(
+        pk=group_quiz.pk,
+        status=QuizStatus.INIT
+    ).aupdate(status=QuizStatus.STARTED)
+
+
 async def add_or_check_chat(chat_id: int):
     data_obj = com_models.Data.get_solo()
     data_obj.channel_id = chat_id
@@ -221,4 +236,3 @@ async def remove_chat(chat_id: int):
     if data_obj.channel_id == chat_id:
         data_obj.channel_id = None
         await data_obj.asave(update_fields=['channel_id'])
-
