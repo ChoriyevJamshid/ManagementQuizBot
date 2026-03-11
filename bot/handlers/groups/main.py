@@ -35,9 +35,7 @@ async def send_quiz_ready_message(message, quiz_part):
 
 
 async def start_quiz_after_delay(group_quiz, bot, state: FSMContext):
-    print("QUIZ WILL START IN 10s")
     await asyncio.sleep(10)
-    print("STARTING QUIZ")
     await start_group_testing(
         group_quiz=group_quiz,
         bot=bot,

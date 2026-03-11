@@ -1,12 +1,15 @@
+from aiogram import types
+
 from django.db import models
 from django.utils import timezone
 from django.utils.timezone import timedelta
-from aiogram import types
+
 
 from common import models as com_models
 from quiz import models as quiz_models
 from quiz.choices import QuizStatus
 from quiz.models import GroupQuiz
+
 from support import models as support_models
 from support.choices import SupportMessageStatus
 
@@ -229,7 +232,7 @@ async def update_group_quiz_is_answer(group_quiz_id):
     return await GroupQuiz.objects.filter(
         pk=group_quiz_id,
         is_answered=False
-    ).aupdate(is_answered=True)
+    ).aupdate(is_answered=True, answers=models.F("answers") + 1)
 
 
 async def add_or_check_chat(chat_id: int):

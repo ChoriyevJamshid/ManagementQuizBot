@@ -104,14 +104,19 @@ from quiz.tasks import group_quiz_create_file
 
 
 async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
+    print("Working send statistics")
     group_quiz = await utils.get_group_quiz(group_id=group_id)
     if not group_quiz:
         return
+
+    print(f"{group_quiz = }")
 
     if group_quiz.status in (QuizStatus.FINISHED, QuizStatus.CANCELED):
         return
 
     players = await redis_group.get_all_players_data(str(group_quiz.pk))
+
+    print(f"{players = }")
 
     part = group_quiz.part
     quiz = part.quiz

@@ -140,6 +140,8 @@ async def delete_group_quiz_data(group_quiz_id: str) -> None:
     Deletes all quiz related redis keys.
     """
 
+    print(f"Dropped {group_quiz_id}")
+
     keys = [
         f"group_quiz:{group_quiz_id}:players",
         f"group_quiz:{group_quiz_id}:scores",
