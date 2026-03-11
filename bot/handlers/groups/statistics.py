@@ -203,13 +203,16 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
 
     group_quiz.participant_count = len(players) if players else 0
 
-    await group_quiz.asave(
-        update_fields=[
-            "data",
-            "participant_count",
-            "status",
-            "updated_at",
-        ]
-    )
+    try:
+        await group_quiz.asave(
+            update_fields=[
+                "data",
+                "participant_count",
+                "status",
+                "updated_at",
+            ]
+        )
+    except Exception as e:
+        print(f"{e = }")
 
     await redis_group.delete_group_quiz_data(str(group_quiz.pk))
