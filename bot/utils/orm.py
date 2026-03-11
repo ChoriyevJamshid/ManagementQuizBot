@@ -219,7 +219,7 @@ async def create_group_quiz(
 
 
 async def update_group_quiz(group_quiz):
-    await GroupQuiz.objects.filter(
+    return await GroupQuiz.objects.filter(
         pk=group_quiz.pk,
         status=QuizStatus.INIT
     ).aupdate(status=QuizStatus.STARTED)
