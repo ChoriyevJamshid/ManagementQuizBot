@@ -17,28 +17,27 @@ async def delete_quiz_reply_markup(group_id: str, message_id: int | str, bot: Bo
 
 
 async def animate_texts(group_id: str, bot: Bot):
+    # 3-2-1-GO: total ~3 seconds instead of 7
     texts = await get_texts(
-        ('group_test_is_starting', 'animate_5', 'animate_4', 'animate_3', 'animate_2', 'animate_1', 'animate_go')
+        ('group_test_is_starting', 'animate_3', 'animate_2', 'animate_1', 'animate_go')
     )
     text_keys = list(texts.keys())
     text_keys.remove('group_test_is_starting')
 
-    await asyncio.sleep(1)
     msg = await bot.send_message(
         chat_id=group_id,
         text=texts['group_test_is_starting'],
     )
-    await asyncio.sleep(1)
 
     for key in text_keys:
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.75)
         try:
             await bot.edit_message_text(
                 chat_id=group_id,
                 message_id=msg.message_id,
                 text=texts[key],
             )
-        except:
+        except Exception:
             msg = await bot.send_message(
                 chat_id=group_id,
                 text=texts[key],

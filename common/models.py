@@ -20,6 +20,7 @@ class TelegramProfile(Profile):
     def __str__(self):
         return self.username if self.username else self.first_name
 
+
 class Data(SingletonModel):
     file_types = models.JSONField(blank=True, null=True)
     video_urls = models.JSONField(blank=True, null=True)

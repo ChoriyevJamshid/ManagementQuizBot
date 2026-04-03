@@ -1,30 +1,29 @@
+import math
+import asyncio
 from pathlib import Path
 from random import choice
 from string import ascii_letters, digits
 
 from aiogram import types
 from aiogram.fsm.context import FSMContext
+from asgiref.sync import sync_to_async
 
 from django.conf import settings
-from django.db import IntegrityError, transaction
-from common.models import TelegramProfile
+from django.db import transaction
 from quiz import models as quiz_models
 
-from bot import utils
-from bot import states
+from bot import utils, states
 from bot.keyboards import reply_kb
-from bot.utils.functions import (
-    get_text,
-    get_texts,
-    get_data_from_document,
-    get_data_from_xlsx,
-    get_data_from_txt,
-)
+from bot.utils.functions import get_text, get_texts
 
 
 ALLOWED_EXTENSIONS = {'docx', 'xlsx', 'txt'}
 PART_QUESTION_OPTIONS = {20, 25, 30, 35}
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
 def _normalize_text(value: str) -> str:
     return ' '.join(str(value).strip().split()).casefold()
@@ -37,21 +36,20 @@ def _prepare_question_data(raw_questions: list[dict]) -> list[dict]:
         correct_answer = str(row.get('correct_answer', '')).strip()[:512]
         options_raw = row.get('options') or []
 
-        cleaned_options = []
-        for option in options_raw:
-            option_text = str(option).strip()[:512]
-            if option_text:
-                cleaned_options.append(option_text)
+        cleaned_options = [
+            str(o).strip()[:512]
+            for o in options_raw
+            if str(o).strip()
+        ]
 
         if not question or len(cleaned_options) < 4:
             continue
 
         correct_norm = _normalize_text(correct_answer)
         correct_in_options = next(
-            (option for option in cleaned_options if _normalize_text(option) == correct_norm),
+            (o for o in cleaned_options if _normalize_text(o) == correct_norm),
             None,
         )
-
         if correct_in_options is None:
             continue
 
@@ -59,35 +57,41 @@ def _prepare_question_data(raw_questions: list[dict]) -> list[dict]:
         if correct_in_options not in options:
             options = cleaned_options[:3] + [correct_in_options]
 
-        prepared.append(
-            {
-                'question': question,
-                'correct_answer': correct_in_options,
-                'options': options,
-            }
-        )
+        prepared.append({
+            'question': question,
+            'correct_answer': correct_in_options,
+            'options': options,
+        })
 
     return prepared
 
 
 def _parse_timer_seconds(timer_text: str) -> int:
-    timer = 0
-    for value in timer_text.split(' '):
-        if value.isdigit():
-            timer += int(value) if int(value) >= 10 else int(value) * 60
-    return timer
+    """Values < 10 are treated as minutes, >= 10 as seconds."""
+    total = 0
+    for token in timer_text.split():
+        if token.isdigit():
+            v = int(token)
+            total += v * 60 if v < 10 else v
+    return total
 
 
-def _generate_unique_link(length: int = 8) -> str:
+def _unique_link(length: int = 8) -> str:
+    """Generates a unique QuizPart link. Runs inside a sync thread."""
     symbols = ascii_letters + digits
-    return ''.join(choice(symbols) for _ in range(length))
+    while True:
+        link = ''.join(choice(symbols) for _ in range(length))
+        if not quiz_models.QuizPart.objects.filter(link=link).exists():
+            return link
+
+
+# ---------------------------------------------------------------------------
+# Handlers
+# ---------------------------------------------------------------------------
 
 async def create_quiz_handler(callback: types.CallbackQuery, state: FSMContext):
-    """
-    This handler must not register
-    """
-
-    text = await get_text('create_quiz_title')
+    """Entry point — show step-by-step intro, then ask for title."""
+    text = await get_text('create_quiz_intro')
     await callback.message.edit_text(text)
     await callback.answer()
     await state.set_state(states.CreateQuizState.title)
@@ -95,115 +99,106 @@ async def create_quiz_handler(callback: types.CallbackQuery, state: FSMContext):
 
 async def create_quiz_get_title_handler(message: types.Message, state: FSMContext):
     if message.content_type != types.ContentType.TEXT:
-        text = await get_text('create_quiz_title')
-        return await message.answer(text)
+        return await message.answer(await get_text('create_quiz_intro'))
 
-    if message.text.startswith("/"):
-        text = await get_text('create_quiz_not_allowed_title')
-        await message.answer(text)
+    if message.text.startswith('/'):
+        await message.answer(await get_text('create_quiz_not_allowed_title'))
         return await message.delete()
 
-    text = await get_text('create_quiz_file')
+    await state.update_data(quiz_title=message.text.strip())
     markup = await reply_kb.back_markup()
-    await state.update_data(quiz_title=message.text)
-    await message.answer(text, reply_markup=markup)
-    return await state.set_state(states.CreateQuizState.file)
-
-
-
+    await message.answer(await get_text('create_quiz_file'), reply_markup=markup)
+    await state.set_state(states.CreateQuizState.file)
 
 
 async def create_quiz_get_file_handler(message: types.Message, state: FSMContext):
     if message.text:
         if message.text.startswith('🔙'):
-            text = await get_text('create_quiz_title')
             markup = await reply_kb.remove_kb()
-            await message.answer(text, reply_markup=markup)
+            await message.answer(await get_text('create_quiz_intro'), reply_markup=markup)
             return await state.set_state(states.CreateQuizState.title)
         return await message.delete()
 
     if not message.document:
-        text = await get_text('create_quiz_file_not_document')
         markup = await reply_kb.back_markup()
-        return await message.answer(text, reply_markup=markup)
-
+        return await message.answer(await get_text('create_quiz_file_not_document'), reply_markup=markup)
 
     extension = Path(message.document.file_name or '').suffix.lower().lstrip('.')
     if extension not in ALLOWED_EXTENSIONS:
-        text = await get_text('create_quiz_file_not_correct_extension')
         markup = await reply_kb.back_markup()
-        return await message.answer(text, reply_markup=markup)
+        return await message.answer(await get_text('create_quiz_file_not_correct_extension'), reply_markup=markup)
+
+    processing_msg = await message.answer(await get_text('create_quiz_processing_file'))
 
     try:
-        file_path, file_format = await download_file(message.bot, message.document.file_id)
+        file_path, file_format = await _download_file(message.bot, message.document.file_id)
+
         if file_format == 'docx':
-            raw_questions = await get_data_from_document(str(file_path))
+            raw_questions = await asyncio.to_thread(_parse_docx_sync, str(file_path))
         elif file_format == 'xlsx':
-            raw_questions = await get_data_from_xlsx(str(file_path))
+            raw_questions = await asyncio.to_thread(_parse_xlsx_sync, str(file_path))
         else:
-            raw_questions = await get_data_from_txt(str(file_path))
+            raw_questions = await asyncio.to_thread(_parse_txt_sync, str(file_path))
     except Exception:
-        text = await get_text('create_quiz_file_parse_error')
+        await processing_msg.delete()
         markup = await reply_kb.back_markup()
-        return await message.answer(text, reply_markup=markup)
+        return await message.answer(await get_text('create_quiz_file_parse_error'), reply_markup=markup)
 
     question_data = _prepare_question_data(raw_questions)
-    if not question_data:
-        text = await get_text('create_quiz_file_not_questions')
-        return await message.answer(text)
+    await processing_msg.delete()
 
-    text = await get_text('create_quiz_part_quantity')
-    markup = await reply_kb.quiz_part_quantity_markup()
-    await message.answer(text, reply_markup=markup)
+    if not question_data:
+        return await message.answer(await get_text('create_quiz_file_not_questions'))
+
     await state.update_data(
         quiz_file_id=message.document.file_id,
         quiz_question_data=question_data,
         quiz_total_questions=len(question_data),
     )
-    return await state.set_state(states.CreateQuizState.check)
+
+    text = await get_text('create_quiz_part_quantity', {'total': str(len(question_data))})
+    markup = await reply_kb.quiz_part_quantity_markup()
+    await message.answer(text, reply_markup=markup)
+    await state.set_state(states.CreateQuizState.check)
 
 
 async def create_quiz_get_quantity_handler(message: types.Message, state: FSMContext):
     if message.content_type != types.ContentType.TEXT:
-        text = await get_text('create_quiz_part_quantity')
         markup = await reply_kb.quiz_part_quantity_markup()
-        return await message.answer(text, reply_markup=markup)
+        return await message.answer(await get_text('create_quiz_part_quantity_not_allowed'), reply_markup=markup)
 
     if message.text.startswith('🔙'):
-        text = await get_text('create_quiz_file')
         markup = await reply_kb.back_markup()
-        await message.answer(text, reply_markup=markup)
+        await message.answer(await get_text('create_quiz_file'), reply_markup=markup)
         return await state.set_state(states.CreateQuizState.file)
 
     if not message.text.isdigit() or int(message.text) not in PART_QUESTION_OPTIONS:
-        text = await get_text('create_quiz_part_quantity_not_allowed')
         markup = await reply_kb.quiz_part_quantity_markup()
-        return await message.answer(text, reply_markup=markup)
+        return await message.answer(await get_text('create_quiz_part_quantity_not_allowed'), reply_markup=markup)
 
     part_size = int(message.text)
-    text = await get_text('create_quiz_timer')
-    markup = await reply_kb.quiz_timers_markup()
-    await message.answer(text, reply_markup=markup)
     await state.update_data(quiz_part_size=part_size)
-    return await state.set_state(states.CreateQuizState.timer)
+    markup = await reply_kb.quiz_timers_markup()
+    await message.answer(await get_text('create_quiz_timer'), reply_markup=markup)
+    await state.set_state(states.CreateQuizState.timer)
 
 
 async def create_quiz_get_timer_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
 
     if message.content_type != types.ContentType.TEXT:
-        text = await get_text('create_quiz_timer')
-        return await message.answer(text)
+        return await message.answer(await get_text('create_quiz_timer'))
 
     if message.text.startswith('🔙'):
-        text = await get_text('create_quiz_part_quantity')
         markup = await reply_kb.quiz_part_quantity_markup()
+        text = await get_text('create_quiz_part_quantity', {
+            'total': str(data.get('quiz_total_questions', 0))
+        })
         await message.answer(text, reply_markup=markup)
         return await state.set_state(states.CreateQuizState.check)
 
-
-    texts = await get_texts(('second', 'minute', 'back_text'))
-    timers = (
+    texts = await get_texts(('second', 'minute'))
+    valid_timers = (
         f"10 {texts['second']}",
         f"15 {texts['second']}",
         f"20 {texts['second']}",
@@ -217,25 +212,26 @@ async def create_quiz_get_timer_handler(message: types.Message, state: FSMContex
         f"2 {texts['minute']}",
     )
 
-    if message.text not in timers:
-        text = await get_text('create_quiz_timer_not_allowed_timer')
-        return await message.answer(text)
+    if message.text not in valid_timers:
+        return await message.answer(await get_text('create_quiz_timer_not_allowed_timer'))
 
     timer = _parse_timer_seconds(message.text)
+    total_questions = data.get('quiz_total_questions', 0)
+    part_size = data.get('quiz_part_size', 25)
+    parts_count = math.ceil(total_questions / part_size)
 
-    text = await get_text(
-        'create_quiz_check_before_save',
-        parameters={
-            'title': data.get('quiz_title', ''),
-            'timer': message.text,
-            'quantity': str(data.get('quiz_total_questions', '')),
-            'part_quantity': str(data.get('quiz_part_size', '')),
-        }
-    )
+    await state.update_data(quiz_timer=timer, quiz_parts_count=parts_count)
+
+    text = await get_text('create_quiz_check_before_save', {
+        'title':         data.get('quiz_title', ''),
+        'quantity':      str(total_questions),
+        'part_quantity': str(part_size),
+        'parts':         str(parts_count),
+        'timer':         message.text,
+    })
     markup = await reply_kb.quiz_save_markup()
-    await state.update_data(quiz_timer=timer)
     await message.answer(text, reply_markup=markup)
-    return await state.set_state(states.CreateQuizState.save)
+    await state.set_state(states.CreateQuizState.save)
 
 
 async def create_quiz_save_handler(message: types.Message, state: FSMContext):
@@ -245,113 +241,157 @@ async def create_quiz_save_handler(message: types.Message, state: FSMContext):
 
     if message.content_type != types.ContentType.TEXT:
         markup = await reply_kb.quiz_save_markup()
-        text = await get_text('use_below_buttons_text')
-        return await message.answer(text, reply_markup=markup)
+        return await message.answer(await get_text('use_below_buttons_text'), reply_markup=markup)
 
-    if message.text and message.text.startswith('🔙'):
-        text = await get_text('create_quiz_timer')
+    if message.text.startswith('🔙'):
         markup = await reply_kb.quiz_timers_markup()
-        await message.answer(text, reply_markup=markup)
+        await message.answer(await get_text('create_quiz_timer'), reply_markup=markup)
         return await state.set_state(states.CreateQuizState.timer)
 
     if message.text != save_button:
         return await message.delete()
 
-    try:
-        await create_quiz(message, data, user)
-    except Exception:
-        text = await get_text('create_quiz_create_error')
-        markup = await reply_kb.quiz_save_markup()
-        return await message.answer(text, reply_markup=markup)
+    saving_msg = await message.answer(await get_text('create_quiz_saving'))
 
-    text = await get_text('create_quiz_success')
+    try:
+        await sync_to_async(_create_quiz_sync)(data, user.id)
+    except Exception:
+        await saving_msg.delete()
+        markup = await reply_kb.quiz_save_markup()
+        return await message.answer(await get_text('create_quiz_create_error'), reply_markup=markup)
+
+    await saving_msg.delete()
     markup = await reply_kb.remove_kb()
     await state.clear()
-    return await message.answer(text, reply_markup=markup)
+    await message.answer(await get_text('create_quiz_success'), reply_markup=markup)
 
 
-async def download_file(bot, file_id: str):
+# ---------------------------------------------------------------------------
+# File download
+# ---------------------------------------------------------------------------
+
+async def _download_file(bot, file_id: str) -> tuple[Path, str]:
     media_dir = Path(settings.BASE_DIR) / 'media'
     media_dir.mkdir(parents=True, exist_ok=True)
-
     file = await bot.get_file(file_id)
     file_format = Path(file.file_path).suffix.lower().lstrip('.')
-    new_file = f"{file.file_id}.{file_format}"
-    destination = media_dir / new_file
+    destination = media_dir / f"{file.file_id}.{file_format}"
     await bot.download_file(file.file_path, str(destination))
-
     return destination, file_format
 
 
-async def create_quiz(message: types.Message, data: dict, user: TelegramProfile):
-    """
-    Not handler
-    """
+# ---------------------------------------------------------------------------
+# Sync file parsers — called via asyncio.to_thread
+# ---------------------------------------------------------------------------
 
-    title = data.get('quiz_title', '')
-    timer = data.get('quiz_timer', 0)
-    file_id = data.get('quiz_file_id', '')
-    question_data = data.get('quiz_question_data', [])
+def _parse_docx_sync(file_path: str) -> list[dict]:
+    import docx
+    data = []
+    for table in docx.Document(file_path).tables:
+        for row in table.rows:
+            cells = row.cells
+            if len(cells) < 3 or len(cells) > 6:
+                continue
+            question = str(cells[0].text).strip()[:256]
+            correct_answer = str(cells[1].text).strip()[:512]
+            options = [str(cells[i].text).strip()[:512] for i in range(1, len(cells)) if cells[i].text.strip()]
+            if question and len(options) >= 2:
+                data.append({'question': question, 'correct_answer': correct_answer, 'options': options})
+    return data
+
+
+def _parse_xlsx_sync(file_path: str) -> list[dict]:
+    import pandas as pd
+    data = []
+    raw = pd.read_excel(file_path, engine='openpyxl', header=None)
+    df = pd.DataFrame(raw).fillna('')
+    for _, raw_row in df.iterrows():
+        cells = [str(v).strip()[:512] for v in raw_row]
+        if len(cells) < 2:
+            continue
+        question = cells[0]
+        correct_answer = cells[1]
+        options = [c for c in cells[1:] if c]
+        if question and len(options) >= 2:
+            data.append({'question': question, 'correct_answer': correct_answer, 'options': options})
+    return data
+
+
+def _parse_txt_sync(file_path: str) -> list[dict]:
+    data = []
+    current: dict = {'options': []}
+    with open(file_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            text = line.strip()
+            if not text:
+                continue
+            if 'question' not in current:
+                current['question'] = text
+            elif 'correct_answer' not in current:
+                current['correct_answer'] = text
+                current['options'].append(text)
+            else:
+                current['options'].append(text)
+                if len(current['options']) == 4:
+                    data.append(current)
+                    current = {'options': []}
+    return data
+
+
+# ---------------------------------------------------------------------------
+# DB write — sync, called via sync_to_async
+# ---------------------------------------------------------------------------
+
+def _create_quiz_sync(data: dict, owner_id: int) -> None:
+    title     = data.get('quiz_title', '')
+    timer     = data.get('quiz_timer', 0)
+    file_id   = data.get('quiz_file_id', '')
+    questions = data.get('quiz_question_data', [])
     part_size = int(data.get('quiz_part_size', 25))
-
-    total_ques = len(question_data)
-    total_parts = total_ques // part_size if not total_ques % part_size else total_ques // part_size + 1
+    total     = len(questions)
 
     with transaction.atomic():
-        new_quiz = quiz_models.Quiz.objects.create(
-            owner_id=user.id,
+        quiz = quiz_models.Quiz.objects.create(
+            owner_id=owner_id,
             title=title[:127],
             file_id=file_id,
             timer=timer,
-            quantity=total_ques,
+            quantity=total,
         )
 
-        for i in range(total_parts):
-            from_i = i * part_size + 1
-            to_i = (i + 1) * part_size if (i + 1) * part_size <= total_ques else total_ques
+        for part_idx in range(math.ceil(total / part_size)):
+            from_i   = part_idx * part_size + 1
+            to_i     = min((part_idx + 1) * part_size, total)
             quantity = to_i - from_i + 1
+            part_num = f"№0{part_idx + 1}" if part_idx + 1 < 10 else f"№{part_idx + 1}"
 
-            part_title = f"№0{i + 1}" if (i + 1) < 10 else f"№{i + 1}"
+            part = quiz_models.QuizPart.objects.create(
+                quiz_id=quiz.id,
+                link=_unique_link(),
+                from_i=from_i,
+                to_i=to_i,
+                quantity=quantity,
+                title=f"{title[:127]} {part_num}",
+            )
 
-            new_part = None
-            for _ in range(10):
-                link = _generate_unique_link()
-                try:
-                    new_part = quiz_models.QuizPart.objects.create(
-                        quiz_id=new_quiz.id,
-                        link=link,
-                        from_i=from_i,
-                        to_i=to_i,
-                        quantity=quantity,
-                        title=f"{title[:127]} {part_title}",
-                    )
-                    break
-                except IntegrityError:
-                    continue
+            part_questions = questions[part_idx * part_size: part_idx * part_size + quantity]
 
-            if new_part is None:
-                raise IntegrityError('Can not generate unique link for quiz part')
+            # 1 query for all questions in this part
+            created_questions = quiz_models.Question.objects.bulk_create([
+                quiz_models.Question(part_id=part.id, text=row['question'])
+                for row in part_questions
+            ])
 
-            for j in range(quantity):
-                row = question_data[i * part_size + j]
-                question = quiz_models.Question.objects.create(
-                    part_id=new_part.id,
-                    text=row['question'],
-                )
-
-                options = row['options'][:4]
+            # 1 query for all options in this part
+            options_batch = []
+            for question_obj, row in zip(created_questions, part_questions):
                 correct_norm = _normalize_text(row['correct_answer'])
-                correct_index = next(
-                    (idx for idx, option in enumerate(options) if _normalize_text(option) == correct_norm),
-                    0,
-                )
-                new_options = []
-                for idx, option_text in enumerate(options):
-                    new_options.append(
+                for option_text in row['options'][:4]:
+                    options_batch.append(
                         quiz_models.Option(
-                            question_id=question.id,
+                            question_id=question_obj.id,
                             text=option_text,
-                            is_correct=idx == correct_index,
+                            is_correct=_normalize_text(option_text) == correct_norm,
                         )
                     )
-                quiz_models.Option.objects.bulk_create(new_options)
+            quiz_models.Option.objects.bulk_create(options_batch)

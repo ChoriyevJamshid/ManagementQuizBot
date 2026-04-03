@@ -9,8 +9,6 @@ from bot.handlers.users.instruction import *
 from bot.handlers.users.quizzes import *
 from bot.handlers.users.testing import *
 from bot.handlers.users.inline_mode import *
-from bot.handlers.users.categories import *
-from bot.handlers.users.support import *
 
 
 def prepare_router() -> Router:
@@ -23,53 +21,6 @@ def prepare_router() -> Router:
 
     # message handlers
     router.message.register(cancel_handler, Command('cancel'))
-
-    # support.py
-    """
-        Handlers from support.py
-    """
-
-
-    router.callback_query.register(
-        support_appeal_to_admin_menu_handler,
-        F.data == 'support-appeal-to-admin-menu'
-    )
-
-    router.callback_query.register(
-        support_handler,
-        F.data == "support-back-to-support-menu"
-    )
-
-    router.callback_query.register(
-        support_appeal_to_admin_handler,
-        F.data.startswith('support-appeal-to-admin'),
-    )
-
-    router.callback_query.register(
-        support_mark_message_as_read_handler,
-        F.data.startswith('support-mark-message-as-read'),
-    )
-
-    router.message.register(
-        support_get_new_message_handler,
-        SupportState.writeToAdmin
-    )
-
-
-    router.callback_query.register(
-        support_add_category_handler,
-        F.data == 'support-add-new-category'
-    )
-
-    router.message.register(
-        support_add_category_title_handler,
-        SupportState.addCategoryTitle
-    )
-
-    router.callback_query.register(
-        support_testing_questions_file_handler,
-        F.data == 'support-testing-questions-file'
-    )
 
     # main.py
     """
@@ -225,41 +176,6 @@ def prepare_router() -> Router:
         instruction_back_to_instruction,
         F.data == "back-to-instruction",
         MainState.instruction,
-    )
-
-    # categories
-    """
-        Handler from categories.py 
-    """
-
-    router.callback_query.register(
-        categories_handler,
-        F.data == "categories-back-to-categories"
-    )
-
-    router.callback_query.register(
-        categories_detail_handler,
-        F.data.startswith("categories-list"),
-    )
-
-    router.callback_query.register(
-        categories_paginate_handler,
-        F.data.startswith("categories-quizzes-paginate")
-    )
-
-    router.callback_query.register(
-        categories_detail_quiz_handler,
-        F.data.startswith("categories-quizzes-detail")
-    )
-
-    router.callback_query.register(
-        categories_back_to_quizzes_handler,
-        F.data.startswith("categories-back-to-quizzes")
-    )
-
-    router.callback_query.register(
-        categories_detail_quiz_part_handler,
-        F.data.startswith("categories-quizzes-parts")
     )
 
     # inline_mode.py

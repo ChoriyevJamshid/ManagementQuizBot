@@ -1,17 +1,18 @@
 import logging
+import asyncio
+import time
 
-from aiogram import Bot
+from aiogram import Bot, types
 from aiogram.dispatcher.event.bases import SkipHandler
 
 from quiz.models import GroupQuiz
 
 from bot import utils
-from bot.states import QuizState
 from bot.utils import redis_group
+from bot.utils.redis_group import redis_client
 from bot.keyboards import inline_kb
 
 from bot.utils.functions import get_text, generate_user_quiz_data
-from bot.utils.redis_group import redis_client
 
 from .common import animate_texts, delete_quiz_reply_markup
 from .statistics import send_statistics
@@ -20,36 +21,24 @@ from .statistics import send_statistics
 logger = logging.getLogger(__name__)
 
 
-"""
-# UPDATES =============================================== UPDATES
-# UPDATES =============================================== UPDATES
-# UPDATES =============================================== UPDATES
-"""
-
-import asyncio
-import time
-from aiogram import types
-from aiogram.fsm.context import FSMContext
-
-
-async def start_group_testing(
-        group_quiz: GroupQuiz,
-        bot: Bot,
-        state: FSMContext
-):
+async def start_group_testing(group_quiz: GroupQuiz, bot: Bot):
     """
     Entry point for starting group quiz testing.
     """
+    quiz_id = str(group_quiz.pk)
 
     await delete_quiz_reply_markup(group_quiz.group_id, group_quiz.message_id, bot)
 
     animation_msg_id = await animate_texts(group_quiz.group_id, bot)
     await bot.delete_message(group_quiz.group_id, animation_msg_id)
 
-    await state.set_state(QuizState.group_testing)
-
+    # Generate once, store in Redis — prevents re-shuffle on continue
     question_data = await generate_user_quiz_data(group_quiz.part)
+    await redis_group.store_questions_data(quiz_id, question_data)
+
     poll_question = await get_text("poll_question")
+
+    await redis_group.set_quiz_active(quiz_id)
 
     await run_group_quiz_loop(
         group_quiz=group_quiz,
@@ -65,37 +54,32 @@ async def run_group_quiz_loop(
         question_data: list,
         poll_question: str,
         timer: int,
-        bot,
+        bot: Bot,
         start_index: int = 0
 ):
     """
     Main loop for sending quiz questions sequentially.
+    All per-question state (is_answered, skips) is tracked in Redis —
+    no DB reads inside the hot loop.
     """
 
+    quiz_id = str(group_quiz.pk)
     total_questions = len(question_data)
 
     for index in range(start_index, total_questions):
 
-        # обновляем объект из БД
-        await group_quiz.arefresh_from_db()
-
-        if not group_quiz:
+        # Check if quiz was stopped externally (stop_handler / statistics)
+        if not await redis_group.is_quiz_active(quiz_id):
             return
 
-        # Проверяем был ли ответ на предыдущий вопрос
-        if index > 0 and not group_quiz.is_answered:
-            group_quiz.skips += 1
-            await group_quiz.asave(update_fields=["skips"])
-
-        # Сброс флага ответа
-        if group_quiz.is_answered:
-            group_quiz.is_answered = False
-            await group_quiz.asave(update_fields=["is_answered"])
-
-        # Проверка на два пропуска
-        if group_quiz.skips >= 2:
-            return await handle_no_answers(group_quiz, index, bot)
-
+        if index > 0:
+            is_answered = await redis_group.is_question_answered(quiz_id)
+            if not is_answered:
+                skips = await redis_group.increment_skips(quiz_id)
+                if skips >= 2:
+                    return await handle_no_answers(group_quiz, index, bot)
+            # Reset flag for the upcoming question
+            await redis_group.reset_question_answered(quiz_id)
 
         await send_question(
             group_quiz=group_quiz,
@@ -109,16 +93,15 @@ async def run_group_quiz_loop(
 
         await asyncio.sleep(timer + 2)
 
+    await redis_group.set_quiz_inactive(quiz_id)
     await send_statistics(group_quiz.group_id, bot)
 
 
-async def handle_no_answers(group_quiz: GroupQuiz, index: int, bot):
+async def handle_no_answers(group_quiz: GroupQuiz, index: int, bot: Bot):
     """
     Handles case when nobody answers two questions in a row.
     """
-
-    group_quiz.skips = 0
-    await group_quiz.asave(update_fields=["skips"])
+    await redis_group.reset_skips(str(group_quiz.pk))
 
     text = await get_text("group_noone_answer_to_questions")
     markup = await inline_kb.test_group_continue_markup(group_quiz.group_id, index)
@@ -137,7 +120,7 @@ async def send_question(
         total_questions: int,
         poll_question: str,
         timer: int,
-        bot,
+        bot: Bot,
 ):
     """
     Sends a single quiz question and poll.
@@ -171,11 +154,12 @@ async def send_question(
 
     group_quiz.poll_id = poll.poll.id
     group_quiz.index = index + 1
-
     await group_quiz.asave(update_fields=["poll_id", "index"])
 
+    quiz_id = str(group_quiz.pk)
+
     await redis_group.set_group_question_data(
-        group_quiz_id=str(group_quiz.pk),
+        group_quiz_id=quiz_id,
         correct_option_id=correct_option_id,
         start_time=time.perf_counter()
     )
@@ -187,10 +171,7 @@ async def send_question(
     )
 
 
-async def group_quiz_continue_callback(
-        callback: types.CallbackQuery,
-        state: FSMContext
-):
+async def group_quiz_continue_callback(callback: types.CallbackQuery):
     await callback.answer()
 
     try:
@@ -209,9 +190,19 @@ async def group_quiz_continue_callback(
     except Exception:
         pass
 
-    question_data = await generate_user_quiz_data(group_quiz.part)
+    quiz_id = str(group_quiz.pk)
+
+    # Restore question order from Redis — no re-shuffle
+    question_data = await redis_group.get_questions_data(quiz_id)
+    if not question_data:
+        # Fallback: Redis key expired (e.g. very long pause), regenerate
+        question_data = await generate_user_quiz_data(group_quiz.part)
+        await redis_group.store_questions_data(quiz_id, question_data)
 
     poll_question = await get_text("poll_question")
+
+    await redis_group.reset_skips(quiz_id)
+    await redis_group.set_quiz_active(quiz_id)
 
     asyncio.create_task(
         run_group_quiz_loop(
@@ -226,60 +217,43 @@ async def group_quiz_continue_callback(
 
 
 async def testing_group_poll_answer_handler(poll_answer: types.PollAnswer):
-
-    print(f"WORKING testing group poll answer handler")
     try:
         end_time = time.perf_counter()
 
-        # -----------------------------
-        # FIND QUIZ FROM REDIS
-        # -----------------------------
+        # Resolve quiz from poll id
         quiz_id = await redis_client.get(f"poll:{poll_answer.poll_id}")
-
-        print(f"\n{quiz_id = }\n")
-
         if not quiz_id:
             raise SkipHandler()
 
-        await utils.update_group_quiz_is_answer(quiz_id)
+        # Atomic first-answer detection via SETNX — only first caller triggers DB write
+        is_first = await redis_group.set_question_answered(quiz_id)
+        if is_first:
+            await utils.update_group_quiz_answers(quiz_id)
 
-        # -----------------------------
-        # GET QUESTION DATA
-        # -----------------------------
+        # Get question metadata
         q_data = await redis_group.get_group_question_data(quiz_id)
-        print(f"\n{q_data = }\n")
-
         correct_option_id = q_data["correct_option_id"]
         start_time = q_data["start_time"]
 
-        # -----------------------------
-        # USER INFO
-        # -----------------------------
-        user_id = str(poll_answer.user.id)
-
+        # Resolve user
         if poll_answer.voter_chat:
             user_id = str(poll_answer.voter_chat.id)
+            username = poll_answer.voter_chat.title or str(poll_answer.voter_chat.id)
+        else:
+            user_id = str(poll_answer.user.id)
+            username = (
+                f"@{poll_answer.user.username}"
+                if poll_answer.user.username
+                else poll_answer.user.first_name
+            )
 
-        username = (
-            f"@{poll_answer.user.username}"
-            if poll_answer.user.username
-            else poll_answer.user.first_name
-        )
-        print(f"\n{username = }\n")
-
-        # -----------------------------
-        # CHECK ANSWER
-        # -----------------------------
         is_correct = (
             len(poll_answer.option_ids) > 0
             and poll_answer.option_ids[0] == correct_option_id
         )
-        print(f"\n{is_correct = }\n")
+
         spent_time = round(end_time - start_time, 2) if start_time else 0.0
-        print(f"\n{spent_time = }\n")
-        # -----------------------------
-        # UPDATE REDIS SCORE
-        # -----------------------------
+
         await redis_group.increment_player_score(
             group_quiz_id=quiz_id,
             user_id=user_id,
@@ -293,5 +267,3 @@ async def testing_group_poll_answer_handler(poll_answer: types.PollAnswer):
 
     except Exception:
         logger.exception("Poll answer handler error")
-
-

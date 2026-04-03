@@ -5,7 +5,6 @@ class MainState(StatesGroup):
     main_menu = State()
     choose_language = State()
     instruction = State()
-    categories = State()
     share_contact = State()
 
     admin = State()
@@ -27,11 +26,5 @@ class QuizState(StatesGroup):
     admin_test = State()
     update_timer = State()
     update_privacy = State()
-
-
-class SupportState(StatesGroup):
-    support = State()
-    writeToAdmin = State()
-    addCategoryTitle = State()
 
 

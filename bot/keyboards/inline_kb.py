@@ -22,8 +22,6 @@ async def main_menu_markup():
         'my_quizzes_button',
         'create_quiz_button',
         'instruction_button',
-        'categories_button',
-        'support_button'
     ))
 
     builder.add(InlineKeyboardButton(
@@ -33,16 +31,10 @@ async def main_menu_markup():
         text=texts['create_quiz_button'], callback_data=f"menu-create-quiz"
     ))
     builder.add(InlineKeyboardButton(
-        text=texts['categories_button'], callback_data=f"menu-categories"
-    ))
-    builder.add(InlineKeyboardButton(
         text=texts['instruction_button'], callback_data=f"menu-instruction"
     ))
-    builder.add(InlineKeyboardButton(
-        text=texts['support_button'], callback_data=f"menu-support"
-    ))
 
-    return builder.adjust(*(2, 2, 1,)).as_markup()
+    return builder.adjust(*(2, 1,)).as_markup()
 
 
 async def get_quizzes_markup(quiz_data: dict, state: FSMContext):
@@ -244,134 +236,6 @@ async def inline_mode_share_quiz_markup(
     return builder.adjust(*(1,)).as_markup()
 
 
-async def get_categories_markup(categories):
-    iterator = 0
-    builder = InlineKeyboardBuilder()
-    texts = await get_texts([category['title'] for category in categories])
-
-    for code, value in texts.items():
-        builder.add(InlineKeyboardButton(
-            text=value,
-            callback_data=f"categories-list_{code}_{categories[iterator]['id']}"
-        ))
-        iterator += 1
-
-    return builder.adjust(*(2,)).attach(InlineKeyboardBuilder().add(
-        InlineKeyboardButton(text="🔙", callback_data="back-to-main-menu")
-    )).as_markup()
-
-
-async def categories_detail_markup(quiz_ids: list | tuple, total_pages: int, page_number: int):
-    builder = InlineKeyboardBuilder()
-
-    for number, quiz_id in enumerate(quiz_ids, start=1):
-        builder.add(InlineKeyboardButton(
-            text=f"Quiz #{number}", callback_data=f"categories-quizzes-detail_{quiz_id}"
-        ))
-    builder.adjust(*(4,))
-    if total_pages > 1:
-        _builder = InlineKeyboardBuilder()
-
-        if page_number > 1:
-            _builder.add(InlineKeyboardButton(
-                text="⬅️", callback_data=f"categories-quizzes-paginate_{page_number - 1}"
-            ))
-        _builder.add(InlineKeyboardButton(
-            text=f"{page_number}", callback_data=f"categories-quizzes-paginate_{page_number}"
-        ))
-
-        if page_number < total_pages:
-            _builder.add(InlineKeyboardButton(
-                text="➡️", callback_data=f"categories-quizzes-paginate_{page_number + 1}"
-            ))
-
-        builder.attach(_builder.adjust(*(3,)))
-
-    return builder.attach(InlineKeyboardBuilder().add(InlineKeyboardButton(
-        text="🔙", callback_data=f"categories-back-to-categories"
-    ))).as_markup()
-
-
-async def categories_quiz_parts_markup(quiz_parts, category: str, category_id: int):
-    builder = InlineKeyboardBuilder()
-
-    if len(quiz_parts) <= 10:
-        sizes = (1,)
-    if 10 < len(quiz_parts) <= 20:
-        sizes = (2,)
-    if 20 < len(quiz_parts) <= 30:
-        sizes = (3,)
-    else:
-        sizes = (4,)
-
-    text = await get_text("questions_text")
-    for quiz_part in quiz_parts:
-        builder.add(InlineKeyboardButton(
-            text=f"[{quiz_part.from_i} - {quiz_part.to_i}]",
-            callback_data=f"categories-quizzes-parts_{quiz_part.link}"
-        ))
-
-    return builder.adjust(*sizes).attach(InlineKeyboardBuilder().add(
-        InlineKeyboardButton(text="🔙", callback_data=f"categories-back-to-quizzes_{category}_{category_id}"))
-    ).as_markup()
-
-
-async def support_menu_markup(texts: dict):
-    builder = InlineKeyboardBuilder()
-
-    builder.add(InlineKeyboardButton(
-        text=f"{texts['appeal_to_admin_button']}",
-        callback_data=f"support-appeal-to-admin-menu"
-    ))
-
-    builder.add(InlineKeyboardButton(
-        text=f"{texts['add_category_button']}",
-        callback_data=f"support-add-new-category"
-    ))
-
-    builder.add(InlineKeyboardButton(
-        text=f"{texts['testing_questions_file']}",
-        callback_data=f"support-testing-questions-file"
-    ))
-
-    builder.add(InlineKeyboardButton(
-        text="🔙", callback_data=f"back-to-main-menu"
-    ))
-
-    return builder.adjust(*(1,)).as_markup()
-
-
-async def support_appeal_to_admin_markup(texts: dict):
-    builder = InlineKeyboardBuilder()
-
-    builder.add(InlineKeyboardButton(
-        text=f"{texts['writen_messages_button']}",
-        callback_data=f"support-appeal-to-admin_messages"
-    ))
-
-    builder.add(InlineKeyboardButton(
-        text=f"{texts['write_new_message_button']}",
-        callback_data=f"support-appeal-to-admin_newMessage"
-    ))
-
-    builder.add(InlineKeyboardButton(
-        text="🔙", callback_data=f"support-back-to-support-menu"
-    ))
-
-    return builder.adjust(*(2,)).as_markup()
-
-
-async def support_message_markup(message_id: int, texts: dict):
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(
-                text=f"{texts['me_read_text']}",
-                callback_data=f"support-mark-message-as-read_{message_id}"
-            )]
-        ]
-    )
-
-
 # admin.py keyboards
 
 async def admin_menu_markup(texts: dict):
@@ -383,40 +247,11 @@ async def admin_menu_markup(texts: dict):
     ))
 
     builder.add(InlineKeyboardButton(
-        text=f"{texts['admin_support_messages_count_button']}",
-        callback_data=f"admin-support-messages-count"
-    ))
-
-    builder.add(InlineKeyboardButton(
-        text=f"{texts['admin_support_pending_messages_button']}",
-        callback_data=f"admin-support-pending-messages"
-    ))
-
-    builder.add(InlineKeyboardButton(
         text=f"🔙",
         callback_data=f"back-to-main-menu"
     ))
 
-    return builder.adjust(*(2, 1, 1)).as_markup()
-
-
-async def admin_pending_message_markup(ids: list):
-    builder = InlineKeyboardBuilder()
-
-    for number, _id in enumerate(ids, start=1):
-        builder.add(
-            InlineKeyboardButton(
-                text=f"#{number}",
-                callback_data=f"admin-pending-message-check_{_id}"
-            )
-        )
-
-    return builder.adjust(*(5,)).attach(
-        InlineKeyboardBuilder().add(InlineKeyboardButton(
-            text="🔙",
-            callback_data=f"back-to-admin-menu"
-        ))
-    ).as_markup()
+    return builder.adjust(*(1, 1)).as_markup()
 
 
 # group handlers keyboards

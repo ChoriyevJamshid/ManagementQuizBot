@@ -1,7 +1,6 @@
 import asyncio
 from aiogram import types
 from aiogram.enums import ChatMemberStatus
-from aiogram.fsm.context import FSMContext
 
 from quiz.choices import QuizStatus
 
@@ -34,19 +33,15 @@ async def send_quiz_ready_message(message, quiz_part):
     return await message.answer(text, reply_markup=markup)
 
 
-async def start_quiz_after_delay(group_quiz, bot, state: FSMContext):
+async def start_quiz_after_delay(group_quiz, bot):
     await asyncio.sleep(10)
-    await start_group_testing(
-        group_quiz=group_quiz,
-        bot=bot,
-        state=state
-    )
+    await start_group_testing(group_quiz=group_quiz, bot=bot)
 
 
 async def stop_handler(message: types.Message):
     group_id = str(message.chat.id)
 
-    group_quiz = await utils.get_group_quiz(group_id=group_id)
+    group_quiz = await utils.get_group_quiz_no_prefetch(group_id=group_id)
 
     if not group_quiz:
         text = await get_text("testing_not_active_quiz")
@@ -73,6 +68,7 @@ async def stop_handler(message: types.Message):
     )
 
     if is_owner or is_admin or is_channel_sender:
+        await redis_group.set_quiz_inactive(str(group_quiz.pk))
         return await send_statistics(
             group_quiz.group_id,
             message.bot,
@@ -80,7 +76,6 @@ async def stop_handler(message: types.Message):
         )
 
     text = await get_text("group_only_owner_can_stop_quiz")
-
     return await message.answer(text)
 
 
@@ -98,7 +93,7 @@ async def start_handler(message: types.Message):
     tg_user = await get_creator(message) if message.from_user.is_bot else message.from_user
 
     if not tg_user:
-        text = await get_text("group_make_bot_as_admin", "uz")
+        text = await get_text("group_make_bot_as_admin")
         return await message.answer(text)
 
     user = await utils.get_user(tg_user)
@@ -106,7 +101,6 @@ async def start_handler(message: types.Message):
     quiz_part = await utils.get_quiz_part(link)
 
     if not quiz_part:
-        # TODO: text quiz not found
         return
 
     group_id = str(message.chat.id)
@@ -120,16 +114,17 @@ async def start_handler(message: types.Message):
         return await message.answer(text)
 
     if not group_quiz:
+        # Send ready message first, then use the actual returned message_id
+        ready_msg = await send_quiz_ready_message(message, quiz_part)
         await utils.create_group_quiz(
             part_id=quiz_part.id,
             user_id=user.id,
             group_id=group_id,
-            message_id=str(message.message_id + 1),
+            message_id=str(ready_msg.message_id),
             title=message.chat.title,
             invite_link=message.chat.invite_link,
         )
-
-        return await send_quiz_ready_message(message, quiz_part)
+        return
 
     if group_quiz.status == QuizStatus.INIT:
 
@@ -146,14 +141,16 @@ async def start_handler(message: types.Message):
             group_quiz.part_id = quiz_part.id
 
         group_quiz.data = {}
-        group_quiz.message_id = str(message.message_id + 1)
         group_quiz.user = user
+
+        ready_msg = await send_quiz_ready_message(message, quiz_part)
+        group_quiz.message_id = str(ready_msg.message_id)
 
         await group_quiz.asave(
             update_fields=["message_id", "part_id", "data", "user"]
         )
 
-        return await send_quiz_ready_message(message, quiz_part)
+        return
 
     text = await get_text(
         "testing_quiz_active_not_stopped",
@@ -163,7 +160,7 @@ async def start_handler(message: types.Message):
     return await message.answer(text)
 
 
-async def get_ready_callback_handler(callback: types.CallbackQuery, state: FSMContext):
+async def get_ready_callback_handler(callback: types.CallbackQuery):
     group_quiz = await utils.get_group_quiz(group_id=str(callback.message.chat.id))
 
     if not group_quiz:
@@ -177,7 +174,6 @@ async def get_ready_callback_handler(callback: types.CallbackQuery, state: FSMCo
         else f"{user.first_name} {user.last_name or ''}".strip()
     )
 
-    # атомарно добавляем игрока
     await redis_group.add_player_to_group_quiz(
         group_quiz_id=str(group_quiz.pk),
         user_id=str(user.id),
@@ -214,19 +210,11 @@ async def get_ready_callback_handler(callback: types.CallbackQuery, state: FSMCo
 
     await callback.answer(callback_text)
 
-    # atomic start
     if players_count >= 2:
-
         updated = await utils.update_group_quiz(group_quiz)
-        print(f"\n{updated = }\n")
         if updated:
-            print(f"working updated")
             asyncio.create_task(
-                start_quiz_after_delay(
-                    group_quiz,
-                    callback.bot,
-                    state
-                )
+                start_quiz_after_delay(group_quiz, callback.bot)
             )
 
     if not group_quiz.invite_link:

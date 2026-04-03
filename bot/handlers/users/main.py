@@ -8,8 +8,6 @@ from bot.utils.functions import get_text, get_texts
 from bot.handlers.users.quizzes import quiz_list_handler
 from bot.handlers.users.create_quizzes import create_quiz_handler
 from bot.handlers.users.instruction import instruction_handler
-from bot.handlers.users.categories import categories_handler
-from bot.handlers.users.support import support_handler
 
 
 async def start_handler(message: types.Message, state: FSMContext):
@@ -61,10 +59,6 @@ async def main_menu_handler(callback: types.CallbackQuery, state: FSMContext):
         await create_quiz_handler(callback, state)
     elif callback.data == "menu-instruction":
         await instruction_handler(callback, state)
-    elif callback.data == "menu-categories":
-        await categories_handler(callback, state)
-    elif callback.data == "menu-support":
-        await support_handler(callback, state)
     else:
         await callback.answer()
 

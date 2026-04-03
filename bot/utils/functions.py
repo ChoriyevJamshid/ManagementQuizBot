@@ -9,18 +9,22 @@ from typing import Optional, Dict
 from django.conf import settings
 from aiogram import types
 
+# Module-level text cache — loaded once, avoids repeated file I/O per request
+_text_cache: dict | None = None
+
+
+def _get_lang_file_path() -> str:
+    return f"{settings.BASE_DIR}/languages/uz.json"
+
 
 def get_text_sync(code: str, parameters: Optional[Dict[str, str]] = None) -> str:
-    file_path = f"{settings.BASE_DIR}/languages/uz.json"
+    global _text_cache
+    if _text_cache is None:
+        with open(_get_lang_file_path(), mode='rb') as file:
+            _text_cache = orjson.loads(file.read())
 
-    with open(file_path, mode='rb') as file:
-        content = file.read()
+    text = _text_cache.get(code, '')
 
-    data = orjson.loads(content)
-    text = data.get(code, '')
-
-    print(f"\n{parameters = }\n")
-    print(f"{text = }\n")
     if parameters and text is not None:
         for key, value in parameters.items():
             text = text.replace(f"__{key}", value)
@@ -29,22 +33,25 @@ def get_text_sync(code: str, parameters: Optional[Dict[str, str]] = None) -> str
 
 
 def get_texts_sync(codes: tuple | list) -> dict:
-    file_path = f"{settings.BASE_DIR}/languages/uz.json"
+    global _text_cache
+    if _text_cache is None:
+        with open(_get_lang_file_path(), mode='rb') as file:
+            _text_cache = orjson.loads(file.read())
 
-    with open(file_path, mode='rb') as file:
-        content = file.read()
+    return {code: _text_cache.get(code, '').strip() for code in codes}
 
-    data = orjson.loads(content)
-    return {code: data.get(code, '').strip() for code in codes}
+
+async def _ensure_text_cache() -> dict:
+    global _text_cache
+    if _text_cache is None:
+        async with aiofiles.open(_get_lang_file_path(), mode='rb') as file:
+            content = await file.read()
+        _text_cache = orjson.loads(content)
+    return _text_cache
 
 
 async def get_text(code: str, parameters: Optional[Dict[str, str]] = None) -> str:
-    file_path = f"{settings.BASE_DIR}/languages/uz.json"
-
-    async with aiofiles.open(file_path, mode='rb') as file:
-        content = await file.read()
-
-    data = orjson.loads(content)
+    data = await _ensure_text_cache()
     text = data.get(code, '')
 
     if parameters and text is not None:
@@ -55,12 +62,7 @@ async def get_text(code: str, parameters: Optional[Dict[str, str]] = None) -> st
 
 
 async def get_texts(codes: tuple | list) -> dict:
-    file_path = f"{settings.BASE_DIR}/languages/uz.json"
-
-    async with aiofiles.open(file_path, mode='rb') as file:
-        content = await file.read()
-
-    data = orjson.loads(content)
+    data = await _ensure_text_cache()
     return {code: data.get(code, '').strip() for code in codes}
 
 

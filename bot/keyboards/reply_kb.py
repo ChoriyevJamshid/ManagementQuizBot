@@ -1,11 +1,9 @@
-from aiogram.fsm.context import FSMContext
 from aiogram.types import ReplyKeyboardRemove
 from aiogram.utils.keyboard import (
     ReplyKeyboardBuilder,
     ReplyKeyboardMarkup,
     KeyboardButton
 )
-from bot import utils
 from bot.utils.functions import get_text, get_texts
 
 
@@ -17,23 +15,6 @@ async def back_markup():
         one_time_keyboard=True
     )
 
-
-async def quiz_category_markup(state: FSMContext):
-    iterator = 1
-    categories = await utils.get_categories()
-    texts = await get_texts([category['title'] for category in categories])
-
-    builder = ReplyKeyboardBuilder()
-    for code, value in texts.items():
-        builder.add(
-            KeyboardButton(text=f"#{iterator}. {value}"),
-        )
-        iterator += 1
-
-    _builder = ReplyKeyboardBuilder().add(KeyboardButton(text=await get_text('back_text')))
-    return builder.adjust(*(2,)).attach(_builder).as_markup(
-        resize_keyboard=True
-    )
 
 
 async def quiz_timers_markup(without_back: bool = False):
@@ -88,15 +69,6 @@ async def quiz_part_quantity_markup():
         builder.add(KeyboardButton(text=button))
     return builder.adjust(*(2, 2, 1)).as_markup(resize_keyboard=True)
 
-
-async def back_to_pending_messaged_markup():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="🔙")]
-        ],
-        resize_keyboard=True,
-        one_time_keyboard=True
-    )
 
 
 async def share_contact_markup(text: str):
