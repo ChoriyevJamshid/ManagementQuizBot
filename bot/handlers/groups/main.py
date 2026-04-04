@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from aiogram import types
 from aiogram.enums import ChatMemberStatus
 
@@ -14,6 +15,8 @@ from bot.utils import redis_group
 from .common import get_creator, check_user_role
 from .statistics import send_statistics
 from .testing import start_group_testing
+
+logger = logging.getLogger(__name__)
 
 
 async def send_quiz_ready_message(message, quiz_part):
@@ -105,7 +108,7 @@ async def start_handler(message: types.Message):
 
     group_id = str(message.chat.id)
 
-    group_quiz = await utils.get_group_quiz(group_id=group_id)
+    group_quiz = await utils.get_group_quiz_no_prefetch(group_id=group_id)
 
     is_allowed = await check_user_role(user)
 
@@ -114,7 +117,6 @@ async def start_handler(message: types.Message):
         return await message.answer(text)
 
     if not group_quiz:
-        # Send ready message first, then use the actual returned message_id
         ready_msg = await send_quiz_ready_message(message, quiz_part)
         await utils.create_group_quiz(
             part_id=quiz_part.id,
@@ -161,7 +163,8 @@ async def start_handler(message: types.Message):
 
 
 async def get_ready_callback_handler(callback: types.CallbackQuery):
-    group_quiz = await utils.get_group_quiz(group_id=str(callback.message.chat.id))
+    # Lightweight query — questions not needed for lobby
+    group_quiz = await utils.get_group_quiz_no_prefetch(group_id=str(callback.message.chat.id))
 
     if not group_quiz:
         return await callback.answer()
@@ -213,6 +216,15 @@ async def get_ready_callback_handler(callback: types.CallbackQuery):
     if players_count >= 2:
         updated = await utils.update_group_quiz(group_quiz)
         if updated:
+            try:
+                starts_text = await get_text("group_quiz_starts_in_10_sec")
+                await callback.bot.send_message(
+                    chat_id=group_quiz.group_id,
+                    text=starts_text,
+                )
+            except Exception:
+                logger.exception("Failed to send 10s countdown message to group %s", group_quiz.group_id)
+
             asyncio.create_task(
                 start_quiz_after_delay(group_quiz, callback.bot)
             )

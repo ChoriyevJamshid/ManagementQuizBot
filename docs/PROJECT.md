@@ -256,14 +256,39 @@ group_quiz:{id}:active       STRING — exists = quiz is running
 
 ---
 
-### `bot/handlers/groups/statistics.py` — TODO (not yet applied, interrupted)
-- Remove ~80 lines of commented-out dead code (old version)
-- Remove all `print()` statements
-- Switch to `get_group_quiz_no_prefetch` (questions not needed)
-- Add `logging.getLogger` for exception handling
+---
 
-### `bot/handlers/groups/handle.py` — TODO (not yet applied)
-- Remove ~45 lines of commented-out dead code (old version)
+## Updates made (session 3 — cleanup + correctness + multi-group perf)
+
+### `bot/handlers/groups/statistics.py` — full rewrite
+- Removed ~80 lines of dead commented code
+- Removed all `print()` → `logging.getLogger`
+- Switched to `get_group_quiz_no_prefetch` (questions not needed, saves DB work)
+- **Atomic double-call guard**: `aupdate(status=new_status)` at the very start — if two callers race (natural finish + `/stop`), only one proceeds (`updated > 0` check). Status is now set atomically at start, not at end.
+- Fixed `skips` formula: `max(0, quantity - corrects - wrongs)` — no negative skips for mid-game joiners
+- `quantity` now correctly uses `group_quiz.index` (actual questions shown) instead of `quiz.quantity`
+- `send_message` and final `asave` wrapped in `try/except` with `logger.exception`
+
+### `bot/handlers/groups/handle.py` — cleaned up
+- Removed ~45 lines of dead commented code
+
+### `bot/handlers/groups/main.py` — UX + perf
+- `get_ready_callback_handler`: switched to `get_group_quiz_no_prefetch` — lobby phase doesn't need questions, saves prefetch overhead for every "Tayyorman" press
+- `start_handler`: also switched to `get_group_quiz_no_prefetch`
+- Added `group_quiz_starts_in_10_sec` UX message when 2nd player joins and quiz is scheduled
+- Added `logging.getLogger` for exceptions
+
+### `bot/utils/orm.py` — sync ORM fixed
+- `get_user`: `filter().first()` → `filter().afirst()` + `create()` → `acreate()`
+- `check_user_exists`: `.exists()` → `.aexists()`
+
+### `bot/utils/functions.py`
+- Removed stray `print(f"\n{sorted_players = }\n")` from `create_excel_statistics`
+
+### `languages/uz.json` — text fixes
+- Fixed broken HTML in `group_quiz_finished_noone_took_part`: `__<strong><strong>title` → `<strong>__title`
+- Fixed typo "buyrug'irini" → "buyrug'ini" in 3 texts
+- Added new key `group_quiz_starts_in_10_sec` for 10s countdown UX notification
 
 ---
 
@@ -331,25 +356,25 @@ send_statistics (statistics.py)
 
 ---
 
-## Known issues — remaining (after session 2)
+## Known issues — remaining (after session 3)
 
 | # | File | Issue | Status |
 |---|---|---|---|
-| 1 | `groups/statistics.py` | Dead code (~80 lines commented), print() statements, uses heavy `get_group_quiz` | TODO |
-| 2 | `groups/handle.py` | Dead code (~45 lines commented) | TODO |
-| 3 | `groups/statistics.py` | `skips` penalty formula: `quantity - corrects - wrongs` is wrong for mid-game joiners | TODO |
-| 4 | `groups/main.py` | No "quiz starts in 10 seconds" UX message when 2nd player joins | TODO |
-| 5 | `bot/utils/orm.py` | Many `async def` functions still call sync ORM (`.first()`, `.create()`) — `DJANGO_ALLOW_ASYNC_UNSAFE=true` masks this | Backlog |
+| 1 | `groups/statistics.py` | Dead code (~80 lines commented), print() statements, uses heavy `get_group_quiz` | **DONE** |
+| 2 | `groups/handle.py` | Dead code (~45 lines commented) | **DONE** |
+| 3 | `groups/statistics.py` | `skips` penalty formula wrong for mid-game joiners | **DONE** (`max(0, ...)`) |
+| 4 | `groups/main.py` | No "quiz starts in 10 seconds" UX message when 2nd player joins | **DONE** |
+| 5 | `bot/utils/orm.py` | `get_user` / `check_user_exists` call sync ORM — blocks event loop | **DONE** (fixed to `afirst`/`acreate`/`aexists`) |
 | 6 | `users/testing.py` | `user_quiz.save()` still sync | Backlog |
 | 7 | `middlewares/logging.py` | `event.from_user` can be None for anon group messages | Backlog |
+| 8 | `bot/utils/orm.py` | Other non-group functions still sync (`get_users_count`, `get_data_solo`, etc.) | Backlog |
 
 ## Known issues — other (not yet fixed)
 
 | File | Issue |
 |---|---|
-| `bot/utils/orm.py` | Most `async def` functions call sync ORM (`.first()`, `.create()`, `.count()`) — blocks event loop. Works only because `DJANGO_ALLOW_ASYNC_UNSAFE=true`. Needs `.afirst()`, `.acreate()`, `.acount()` etc. |
-| `bot/utils/functions.py` | `get_text()` / `get_texts()` open and parse `uz.json` from disk on every call — should load once into memory at startup |
-| `bot/utils/functions.py` | `testing_animation()` uses `time.sleep()` (sync) inside async — blocks event loop. Should be `asyncio.sleep()` |
+| `bot/utils/orm.py` | Non-group functions (`get_users_count`, `get_data_solo`, `get_languages`, `get_quiz_by_id`, etc.) still call sync ORM — blocks event loop |
+| `bot/utils/functions.py` | `testing_animation()` uses `time.sleep()` (sync) inside async — blocks event loop for individual quiz |
 | `bot/handlers/users/testing.py` | `user_quiz.save()` calls are sync — should be `await user_quiz.asave()` |
 | `bot/middlewares/logging.py` | `event.from_user` can be `None` for anonymous group messages — raises `AttributeError` |
 

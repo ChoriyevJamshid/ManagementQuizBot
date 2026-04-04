@@ -4,7 +4,8 @@ set -e
 export $(grep -v '^#' .env | xargs)
 
 echo "🔄 Ожидание PostgreSQL..."
-while ! nc -z postgres 5432; do
+while ! nc -z postgres :q
+; do
   sleep 0.5
 done
 
@@ -16,13 +17,10 @@ python manage.py migrate --noinput
 echo "🧼 Сборка статики..."
 python manage.py collectstatic --noinput
 
-# if [ "$WITH_BOT" = "true" ]; then
-  # echo "❌ Удаление Webhook (запущен with-bot)..."
-  # python manage.py deletewebhook
-# else
-  echo "✅ Установка Webhook (бот не активен)..."
-  python manage.py setwebhook
-# fi
+
+echo "✅ Установка Webhook (бот не активен)..."
+python manage.py setwebhook
+
 
 echo "🚀 Запуск Gunicorn..."
 exec gunicorn src.asgi:application \

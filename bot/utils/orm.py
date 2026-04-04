@@ -20,13 +20,13 @@ async def get_data_solo():
 
 
 async def check_user_exists(chat: types.User):
-    return com_models.TelegramProfile.objects.filter(chat_id=chat.id).exists()
+    return await com_models.TelegramProfile.objects.filter(chat_id=chat.id).aexists()
 
 
 async def get_user(chat: types.Chat | types.User, message=None, callback=None):
-    user = com_models.TelegramProfile.objects.filter(chat_id=chat.id).first()
+    user = await com_models.TelegramProfile.objects.filter(chat_id=chat.id).afirst()
     if not user:
-        user = com_models.TelegramProfile.objects.create(
+        user = await com_models.TelegramProfile.objects.acreate(
             chat_id=chat.id,
             username=chat.username,
             first_name=chat.first_name,

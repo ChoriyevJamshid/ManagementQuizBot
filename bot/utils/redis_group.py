@@ -2,7 +2,15 @@ import orjson
 import redis.asyncio as redis
 from django.conf import settings
 
-redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True)
+# Explicit pool: 50+ players × multiple groups → need headroom for concurrent commands.
+# Each active group quiz can fire 50+ poll_answer events simultaneously.
+redis_client = redis.from_url(
+    settings.REDIS_URL,
+    decode_responses=True,
+    max_connections=100,
+    socket_timeout=5,
+    socket_connect_timeout=5,
+)
 
 _QUIZ_TTL = 86400  # 24 hours
 
