@@ -8,7 +8,6 @@ from bot.utils.functions import *
 
 async def quiz_list_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else "en"
 
     quiz_data = {}
     page_number = 1
@@ -17,7 +16,7 @@ async def quiz_list_handler(callback: types.CallbackQuery, state: FSMContext):
     quizzes = await utils.get_user_quizzes(user.id)
 
     if not quizzes:
-        text = await get_text("quiz_list_user_not_quizzes", language)
+        text = await get_text("quiz_list_user_not_quizzes")
         await callback.answer(text)
         return
 
@@ -26,7 +25,7 @@ async def quiz_list_handler(callback: types.CallbackQuery, state: FSMContext):
     total_pages = len(quizzes) // paginate_by if not len(quizzes) % paginate_by else len(quizzes) // paginate_by + 1
 
     quizzes = quizzes[from_i:to_i]
-    text = await get_text('quiz_list_user_quizzes', language)
+    text = await get_text('quiz_list_user_quizzes')
     text += "\n"
     for index, quiz in enumerate(quizzes, start=1):
         text += f"\n<b>Quiz №{from_i + index}</b>. <i>{quiz['title']}</i>"
@@ -37,7 +36,7 @@ async def quiz_list_handler(callback: types.CallbackQuery, state: FSMContext):
         "total_pages": total_pages,
     })
     await callback.message.edit_text(
-        text=text, reply_markup=await inline_kb.get_quizzes_markup(quiz_data, state, language)
+        text=text, reply_markup=await inline_kb.get_quizzes_markup(quiz_data, state)
     )
     await callback.answer()
     await state.set_state(QuizState.quizzes)
@@ -46,7 +45,6 @@ async def quiz_list_handler(callback: types.CallbackQuery, state: FSMContext):
 async def quiz_list_paginate_handler(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else "en"
 
     cd = int(callback.data.split('_')[-1])
     current_page = int(data.get('current_page', 0))
@@ -64,7 +62,7 @@ async def quiz_list_paginate_handler(callback: types.CallbackQuery, state: FSMCo
     total_pages = len(quizzes) // paginate_by if not len(quizzes) % paginate_by else len(quizzes) // paginate_by + 1
 
     quizzes = quizzes[from_i:to_i]
-    text = await get_text('quiz_list_user_quizzes', language)
+    text = await get_text('quiz_list_user_quizzes')
     text += "\n"
     for index, quiz in enumerate(quizzes, start=1):
         text += f"\n<b>Quiz №{from_i + index}</b>. <i>{quiz['title']}</i>"
@@ -75,21 +73,20 @@ async def quiz_list_paginate_handler(callback: types.CallbackQuery, state: FSMCo
         "total_pages": total_pages,
     })
     await callback.message.edit_text(
-        text=text, reply_markup=await inline_kb.get_quizzes_markup(quiz_data, state, language)
+        text=text, reply_markup=await inline_kb.get_quizzes_markup(quiz_data, state)
     )
     await callback.answer()
 
 
 async def quiz_list_detail_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else "en"
 
     quiz_id = int(callback.data.split('_')[-1])
     quiz = await utils.get_quiz_by_id(quiz_id)
     quiz_parts = await utils.get_quiz_parts(quiz_id)
 
-    text = await get_text('quiz_list_detail_quiz_parts', language)
-    markup = await inline_kb.quiz_detail_markup(quiz, language)
+    text = await get_text('quiz_list_detail_quiz_parts')
+    markup = await inline_kb.quiz_detail_markup(quiz)
     text += "\n"
     for index, quiz_part in enumerate(quiz_parts, start=1):
         text += f"\n<b>{index}. [{quiz_part.from_i} - {quiz_part.to_i}]</b> 👉 /quiz_{quiz_part.link}"
@@ -100,12 +97,11 @@ async def quiz_list_detail_handler(callback: types.CallbackQuery, state: FSMCont
 
 async def quiz_list_edit_timer_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else "en"
 
     quiz_id = int(callback.data.split('_')[-1])
 
-    text = await get_text('edit_quiz_timer', language)
-    markup = await reply_kb.quiz_timers_markup(language, without_back=True)
+    text = await get_text('edit_quiz_timer')
+    markup = await reply_kb.quiz_timers_markup(without_back=True)
 
     await state.update_data(update_quiz_id=quiz_id)
     await callback.message.delete_reply_markup()
@@ -117,9 +113,8 @@ async def quiz_list_edit_timer_handler(callback: types.CallbackQuery, state: FSM
 async def quiz_list_timer_edit_success_handler(message: types.Message, state: FSMContext):
     data = await state.get_data()
     user = await utils.get_user(message.from_user)
-    language = user.language if user.language else "en"
 
-    texts = await get_texts(('second', 'minute', 'back_text'), language)
+    texts = await get_texts(('second', 'minute', 'back_text'))
     timers = (
         f"10 {texts['second']}",
         f"15 {texts['second']}",
@@ -136,7 +131,7 @@ async def quiz_list_timer_edit_success_handler(message: types.Message, state: FS
     )
 
     if message.text not in timers:
-        text = await get_text('create_quiz_timer_not_allowed_timer', language)
+        text = await get_text('create_quiz_timer_not_allowed_timer')
         await message.answer(text)
         return
 
@@ -144,7 +139,7 @@ async def quiz_list_timer_edit_success_handler(message: types.Message, state: FS
     quiz = await utils.get_quiz_by_id(quiz_id)
 
     if not quiz:
-        text = await get_text('quiz_list_quiz_not_found', language)
+        text = await get_text('quiz_list_quiz_not_found')
         await message.answer(text)
         return
 
@@ -161,10 +156,10 @@ async def quiz_list_timer_edit_success_handler(message: types.Message, state: FS
 
     texts = await get_texts((
         'quiz_list_timer_edit_success', 'quiz_list_detail_quiz_parts'
-    ), language)
+    ))
 
     text = texts['quiz_list_detail_quiz_parts']
-    markup = await inline_kb.quiz_detail_markup(quiz, language)
+    markup = await inline_kb.quiz_detail_markup(quiz)
     text += "\n"
 
     quiz_parts = await utils.get_quiz_parts(quiz_id)
@@ -178,20 +173,19 @@ async def quiz_list_timer_edit_success_handler(message: types.Message, state: FS
 
 async def quiz_list_edit_privacy_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else "en"
 
     quiz_id = int(callback.data.split('_')[-1])
     quiz = await utils.get_quiz_values(quiz_id, ('id', 'title', 'privacy'))
 
     if not quiz:
-        text = await get_text('quiz_not_found', language)
+        text = await get_text('quiz_not_found')
         return await callback.answer(text)
 
-    texts = await get_texts(('turn_off', 'turn_on', 'turning_off', 'turning_on'), language)
+    texts = await get_texts(('turn_off', 'turn_on', 'turning_off', 'turning_on'))
     _privacy = "🔒" if quiz.get("privacy") is True else "🔐"
     ptext = texts['turn_off'] if quiz.get("privacy") is True else texts['turn_on']
 
-    text = await get_text('quiz_list_edit_privacy', language, {
+    text = await get_text('quiz_list_edit_privacy', {
         'title': quiz.get('title', ''),
         "privacy": _privacy,
         "ptext": ptext
@@ -205,23 +199,22 @@ async def quiz_list_edit_privacy_handler(callback: types.CallbackQuery, state: F
 
 async def quiz_list_change_privacy_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else "en"
 
     _, is_privacy, quiz_id = callback.data.split('_')
 
     quiz = await utils.get_quiz_by_id(int(quiz_id))
 
     if not quiz:
-        text = await get_text('quiz_not_found', language)
+        text = await get_text('quiz_not_found')
         return await callback.answer(text)
 
     if int(is_privacy) == 0:
-        _text = await get_text("quiz_detail_not_changed_privacy", language, {
+        _text = await get_text("quiz_detail_not_changed_privacy", {
             'title': quiz.title
         })
 
     elif int(is_privacy) == 1:
-        _text = await get_text("quiz_detail_changed_privacy", language, {
+        _text = await get_text("quiz_detail_changed_privacy", {
             'title': quiz.title
         })
         quiz.privacy = not quiz.privacy
@@ -231,8 +224,8 @@ async def quiz_list_change_privacy_handler(callback: types.CallbackQuery, state:
 
     quiz_parts = await utils.get_quiz_parts(quiz.id)
 
-    text = await get_text('quiz_list_detail_quiz_parts', language)
-    markup = await inline_kb.quiz_detail_markup(quiz, language)
+    text = await get_text('quiz_list_detail_quiz_parts')
+    markup = await inline_kb.quiz_detail_markup(quiz)
     text += "\n"
     for index, quiz_part in enumerate(quiz_parts, start=1):
         text += f"\n<b>{index}. [{quiz_part.from_i} - {quiz_part.to_i}]</b> 👉 /quiz_{quiz_part.link}"
@@ -244,10 +237,9 @@ async def quiz_list_change_privacy_handler(callback: types.CallbackQuery, state:
 
 async def quiz_list_back_to_main_menu_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
-    language = user.language if user.language else "en"
 
-    markup = await inline_kb.main_menu_markup(user.language)
-    text = await get_text('main_menu', language)
+    markup = await inline_kb.main_menu_markup()
+    text = await get_text('main_menu')
     await callback.message.edit_text(text, reply_markup=markup)
     await state.clear()
     await state.set_state(MainState.main_menu)

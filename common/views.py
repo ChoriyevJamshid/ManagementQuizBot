@@ -1,25 +1,29 @@
-import asyncio
 import logging
-from asgiref.sync import async_to_sync
-from django.http.request import HttpRequest
-from django.views.decorators.csrf import csrf_exempt
-from django.http.response import HttpResponse
 
+from django.http import HttpRequest, HttpResponse
+from django.views.decorators.csrf import csrf_exempt
 
 from bot.webhook import webhook
 
 
+logger = logging.getLogger(__name__)
+
 
 @csrf_exempt
-async def telegram_webhook(request: HttpRequest):
-    logging.info(f"Webhook received: {request}\n")
+async def telegram_webhook(request: HttpRequest) -> HttpResponse:
+    """
+    Telegram webhook endpoint
+    """
+
+    if request.method != "POST":
+        return HttpResponse(status=405)
+
     try:
-        # если webhook.process — sync функция, обернем её
-        body = request.body.decode("utf-8")
-        asyncio.create_task(webhook.process_body(body))
-    except Exception as e:
-        print(e)
-        logging.error(e)
-    return HttpResponse(status=200)
 
+        await webhook.process_update(request.body)
 
+        return HttpResponse(status=200)
+
+    except Exception:
+        logger.exception("Webhook error")
+        return HttpResponse(status=500)

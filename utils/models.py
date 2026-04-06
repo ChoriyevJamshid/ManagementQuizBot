@@ -17,7 +17,6 @@ class Profile(BaseModel):
     last_name = models.CharField(max_length=255, blank=True, null=True)
     phone_number = models.CharField(max_length=31, blank=True, null=True)
     role = models.CharField(max_length=255, choices=Role.choices, default=Role.USER)
-    language = models.CharField(max_length=7,blank=True, null=True)
 
     class Meta:
         abstract = True

@@ -1,7 +1,7 @@
 import asyncio
 from aiogram import types
 from bot.utils.functions import get_texts, get_text
-from quiz.tasks import send_notify_to_quiz_owner
+
 from utils import Role
 
 
@@ -16,10 +16,9 @@ async def delete_quiz_reply_markup(group_id: str, message_id: str, callback: typ
         pass
 
 
-async def animate_texts(group_id: str, callback: types.CallbackQuery, language: str = "en"):
+async def animate_texts(group_id: str, callback: types.CallbackQuery):
     texts = await get_texts(
-        ('group_test_is_starting', 'animate_5', 'animate_4', 'animate_3', 'animate_2', 'animate_1', 'animate_go'),
-        language=language
+        ('group_test_is_starting', 'animate_5', 'animate_4', 'animate_3', 'animate_2', 'animate_1', 'animate_go')
     )
     text_keys = list(texts.keys())
     text_keys.remove('group_test_is_starting')
@@ -57,32 +56,13 @@ async def get_creator(message: types.Message) -> types.User | None:
     return user
 
 
-async def check_quiz_part_owner(
-        quiz_part,
+async def check_user_role(
         user,
-        message,
-        language: str = "en"
+        message
 ):
-    if user.role != Role.ADMIN:
-        if user.phone_number:
-            user_cred = user.phone_number
-        elif user.username:
-            user_cred = f"@{user.username}"
-        else:
-            user_cred = user.first_name
-            if user.last_name:
-                user_cred += " " + user.last_name
-
-        group_cred = f"@{message.chat.username}" if message.chat.username else message.chat.title
-        text = await get_text('testing_group_quiz_is_private', language)
-
+    if user.role not in [Role.ADMIN, Role.MODERATOR]:
+        text = await get_text('testing_not_allowed_role')
         await message.answer(text)
-        send_notify_to_quiz_owner.delay(
-            quiz_id=quiz_part.quiz.id,
-            group_credential=group_cred,
-            user_credential=user_cred,
-            user_chat_id=user.chat_id
-        )
         return False
     return True
 

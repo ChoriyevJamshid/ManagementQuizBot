@@ -8,20 +8,20 @@ from quiz.models import GroupQuiz
 from bot import utils
 from bot.states import QuizState
 from bot.utils.functions import get_text, generate_user_quiz_data
+from bot.utils import redis_group
 from .send_test import send_tests_by_recurse
 from .common import animate_texts, delete_quiz_reply_markup
 
 
 async def testing_send_tests_by_recurse(group_quiz: GroupQuiz, callback: types.CallbackQuery, state: FSMContext):
-    language = group_quiz.language or "en"
     await delete_quiz_reply_markup(group_quiz.group_id, group_quiz.message_id, callback)
-    message_id = await animate_texts(group_quiz.group_id, callback, language=language)
+    message_id = await animate_texts(group_quiz.group_id, callback)
 
     await callback.bot.delete_message(chat_id=group_quiz.group_id, message_id=message_id)
     await state.set_state(QuizState.group_testing)
 
     question_data = await generate_user_quiz_data(group_quiz.part)
-    poll_question = await get_text('poll_question', language)
+    poll_question = await get_text('poll_question')
 
     return await send_tests_by_recurse(
         group_id=group_quiz.group_id,
@@ -41,9 +41,8 @@ async def testing_continue_callback_handler(callback: types.CallbackQuery, state
     if not group_quiz:
         return await callback.answer()
 
-    language = group_quiz.language or "en"
     question_data = await generate_user_quiz_data(group_quiz.part)
-    poll_question = await get_text('poll_question', language)
+    poll_question = await get_text('poll_question')
 
     await callback.message.delete_reply_markup()
     await callback.answer()
@@ -59,43 +58,72 @@ async def testing_continue_callback_handler(callback: types.CallbackQuery, state
     )
 
 
+from aiogram.dispatcher.event.bases import SkipHandler
+import traceback
+
 async def testing_group_poll_answer_handler(poll_answer: types.PollAnswer):
-    end_time = time.perf_counter()
-    group_quiz = await utils.get_group_quiz_by_poll_id(poll_answer.poll_id)
+    try:
+        end_time = time.perf_counter()
+        
+        # DEBUG Logging setup
+        with open("poll_debug.log", "a") as f:
+            f.write(f"\\n--- Poll Answer Received! User: {poll_answer.user.id}, Poll ID: {poll_answer.poll_id} ---\\n")
+        
+        group_quiz = await utils.get_group_quiz_by_poll_id(poll_answer.poll_id)
 
-    if not group_quiz:
-        return
+        if not group_quiz:
+            with open("poll_debug.log", "a") as f:
+                f.write(f"group_quiz not found for poll_id: {poll_answer.poll_id}. Skipping to next handler.\\n")
+            raise SkipHandler()
 
-    if not group_quiz.is_answered:
-        group_quiz.is_answered = True
-        group_quiz.answers += 1
+        with open("poll_debug.log", "a") as f:
+            f.write(f"Found group_quiz: {group_quiz.pk}, answering: {group_quiz.is_answered}\\n")
 
-    players_data = group_quiz.data.get('players', {})
-    user_id = str(poll_answer.user.id)
-    if poll_answer.voter_chat:
-        user_id = str(poll_answer.voter_chat.id)
+        if not group_quiz.is_answered:
+            updated = await type(group_quiz).objects.filter(
+                pk=group_quiz.pk, is_answered=False
+            ).aupdate(
+                is_answered=True
+            )
+            # Fetch the actual database current answers count explicitly, avoiding F expressions that may crash in some db backends
+            if updated:
+                group_quiz.is_answered = True
+                await type(group_quiz).objects.filter(pk=group_quiz.pk).aupdate(
+                    answers=group_quiz.answers + 1
+                )
 
-    user_data = players_data.get(user_id, None)
-    if poll_answer.user.username:
-        username = "@" + poll_answer.user.username
-    else:
-        username = poll_answer.user.first_name
+        user_id = str(poll_answer.user.id)
+        if poll_answer.voter_chat:
+            user_id = str(poll_answer.voter_chat.id)
 
-    if not user_data:
-        user_data = {
-            'corrects': 0,
-            'wrongs': 0,
-            'spent_time': 0,
-            'username': username
-        }
+        if poll_answer.user.username:
+            username = "@" + poll_answer.user.username
+        else:
+            username = poll_answer.user.first_name
 
-    if poll_answer.option_ids[0] == group_quiz.data.get('correct_option_id', 10):
-        user_data['corrects'] += 1
-    else:
-        user_data['wrongs'] += 1
+        q_data = await redis_group.get_group_question_data(str(group_quiz.pk))
+        correct_option_id = q_data.get("correct_option_id", 10)
+        start_time = q_data.get("start_time", 0.0)
 
-    user_data['spent_time'] += round(end_time - group_quiz.data.get('start_time', 0), 1)
-    players_data[user_id] = user_data
-    group_quiz.data['players'] = players_data
-    await group_quiz.asave(update_fields=['data', 'is_answered', 'answers'])
+        is_correct = bool(len(poll_answer.option_ids) > 0 and poll_answer.option_ids[0] == correct_option_id)
+        spent_time = round(end_time - start_time, 1) if start_time else 0.0
+
+        with open("poll_debug.log", "a") as f:
+            f.write(f"Updating Redis - user_id: {user_id}, is_correct: {is_correct}, spent_time: {spent_time}\\n")
+
+        await redis_group.increment_player_score(
+            group_quiz_id=str(group_quiz.pk),
+            user_id=user_id,
+            is_correct=is_correct,
+            spent_time=spent_time,
+            username=username
+        )
+        
+        with open("poll_debug.log", "a") as f:
+            f.write(f"SUCCESS\\n")
+
+    except Exception as e:
+        with open("poll_debug.log", "a") as f:
+            f.write(f"ERROR: {e}\\n{traceback.format_exc()}\\n")
+
 

@@ -11,7 +11,6 @@ from bot.handlers.users.testing import *
 from bot.handlers.users.inline_mode import *
 from bot.handlers.users.categories import *
 from bot.handlers.users.support import *
-from bot.handlers.users import acception
 
 
 def prepare_router() -> Router:
@@ -72,25 +71,10 @@ def prepare_router() -> Router:
         F.data == 'support-testing-questions-file'
     )
 
-    # acception.py
-    """
-        Handlers from acception.py    
-    """
-    router.callback_query.register(
-        acception.add_user_to_quiz_allowed_callback,
-        F.data.startswith('accept-user-to-use-quiz')
-    )
-
     # main.py
     """
-        Handler from main.py 
+    Handler from main.py 
     """
-
-    router.callback_query.register(
-        choose_language_handler,
-        MainState.choose_language,
-        F.data.startswith("choose-language")
-    )
 
     router.callback_query.register(
         main_menu_handler,
@@ -105,14 +89,14 @@ def prepare_router() -> Router:
     )
 
     router.message.register(
-        create_quiz_get_category_handler,
-        CreateQuizState.category,
-    )
-
-    router.message.register(
         create_quiz_get_file_handler,
         F.content_type.in_({types.ContentType.TEXT, types.ContentType.DOCUMENT}),
         CreateQuizState.file
+    )
+
+    router.message.register(
+        create_quiz_get_quantity_handler,
+        CreateQuizState.check,
     )
 
     router.message.register(
@@ -134,6 +118,12 @@ def prepare_router() -> Router:
     """
         Handler from quizzes.py 
     """
+
+    router.callback_query.register(
+        quiz_list_handler,
+        F.data == "menu-quizzes"
+
+    )
 
     router.message.register(
         quiz_list_timer_edit_success_handler,

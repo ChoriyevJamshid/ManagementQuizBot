@@ -200,7 +200,6 @@ async def create_group_quiz(
         message_id: str,
         title: str,
         invite_link: str,
-        language: str,
 ):
     return await quiz_models.GroupQuiz.objects.acreate(
         part_id=part_id,
@@ -209,7 +208,6 @@ async def create_group_quiz(
         message_id=message_id,
         title=title,
         invite_link=invite_link,
-        language=language,
     )
 
 async def add_or_check_chat(chat_id: int):
