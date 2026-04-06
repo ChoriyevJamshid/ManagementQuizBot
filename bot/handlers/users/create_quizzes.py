@@ -32,12 +32,12 @@ def _normalize_text(value: str) -> str:
 def _prepare_question_data(raw_questions: list[dict]) -> list[dict]:
     prepared = []
     for row in raw_questions:
-        question = str(row.get('question', '')).strip()[:512]
-        correct_answer = str(row.get('correct_answer', '')).strip()[:512]
+        question = str(row.get('question', '')).strip()[:800]
+        correct_answer = str(row.get('correct_answer', '')).strip()[:800]
         options_raw = row.get('options') or []
 
         cleaned_options = [
-            str(o).strip()[:512]
+            str(o).strip()[:800]
             for o in options_raw
             if str(o).strip()
         ]
@@ -292,9 +292,9 @@ def _parse_docx_sync(file_path: str) -> list[dict]:
             cells = row.cells
             if len(cells) < 3 or len(cells) > 6:
                 continue
-            question = str(cells[0].text).strip()[:256]
-            correct_answer = str(cells[1].text).strip()[:512]
-            options = [str(cells[i].text).strip()[:512] for i in range(1, len(cells)) if cells[i].text.strip()]
+            question = str(cells[0].text).strip()[:800]
+            correct_answer = str(cells[1].text).strip()[:800]
+            options = [str(cells[i].text).strip()[:800] for i in range(1, len(cells)) if cells[i].text.strip()]
             if question and len(options) >= 2:
                 data.append({'question': question, 'correct_answer': correct_answer, 'options': options})
     return data
@@ -306,7 +306,7 @@ def _parse_xlsx_sync(file_path: str) -> list[dict]:
     raw = pd.read_excel(file_path, engine='openpyxl', header=None)
     df = pd.DataFrame(raw).fillna('')
     for _, raw_row in df.iterrows():
-        cells = [str(v).strip()[:512] for v in raw_row]
+        cells = [str(v).strip()[:800] for v in raw_row]
         if len(cells) < 2:
             continue
         question = cells[0]
@@ -353,7 +353,7 @@ def _create_quiz_sync(data: dict, owner_id: int) -> None:
     with transaction.atomic():
         quiz = quiz_models.Quiz.objects.create(
             owner_id=owner_id,
-            title=title[:127],
+            title=title[:800],
             file_id=file_id,
             timer=timer,
             quantity=total,
@@ -371,7 +371,7 @@ def _create_quiz_sync(data: dict, owner_id: int) -> None:
                 from_i=from_i,
                 to_i=to_i,
                 quantity=quantity,
-                title=f"{title[:127]} {part_num}",
+                title=f"{title[:800]} {part_num}",
             )
 
             part_questions = questions[part_idx * part_size: part_idx * part_size + quantity]

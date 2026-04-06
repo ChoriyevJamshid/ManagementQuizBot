@@ -36,8 +36,8 @@ class Quiz(BaseModel):
         related_name="quizzes"
     )
 
-    title = models.CharField(max_length=127)
-    file_id = models.CharField(max_length=255)
+    title = models.TextField()
+    file_id = models.CharField(max_length=1023)
 
     quantity = models.PositiveIntegerField()
     timer = models.PositiveSmallIntegerField()
@@ -55,8 +55,7 @@ class QuizPart(BaseModel):
         on_delete=models.CASCADE,
         related_name="parts"
     )
-    title = models.CharField(
-        max_length=255,
+    title = models.TextField(
         blank=True,
         null=True
     )
