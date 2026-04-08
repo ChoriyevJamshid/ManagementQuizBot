@@ -66,7 +66,7 @@ statistics_file_sent = (
 
 group_noone_answer_to_questions = (
     "Hech kim testlarga javob bermayapdi 😕.\nDavom etish uchun pastdagi tugmani bosing ⬇️."
-    "\nTo'xtatish uchun /stopQuiz buyrug'ini yuboring 🚫."
+    "\nTo'xtatish uchun /stop buyrug'ini yuboring 🚫."
 )
 testing_continue_button = "Davom ettirish"
 group_quiz_finished_noone_took_part = (
