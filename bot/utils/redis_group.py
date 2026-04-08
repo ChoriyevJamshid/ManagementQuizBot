@@ -57,12 +57,16 @@ async def increment_player_score(
     Atomically increments player statistics using a pipeline.
     """
 
+    players_key = f"group_quiz:{group_quiz_id}:players"
     scores_key = f"group_quiz:{group_quiz_id}:scores"
     wrongs_key = f"group_quiz:{group_quiz_id}:wrongs"
     times_key = f"group_quiz:{group_quiz_id}:times"
     usernames_key = f"group_quiz:{group_quiz_id}:usernames"
 
     pipe = redis_client.pipeline()
+
+    pipe.sadd(players_key, user_id)
+    pipe.expire(players_key, _QUIZ_TTL)
 
     if username:
         pipe.hset(usernames_key, user_id, username)
