@@ -72,12 +72,9 @@ async def testing_stop_quiz_handler(message: types.Message, state: FSMContext):
 async def testing_link_handler(message: types.Message, state: FSMContext):
 
     user = await utils.get_user(message.from_user)
-    print(f"{user = }")
     data_solo = await utils.get_data_solo()
-    print(f"{data_solo = }")
 
     title = await utils.get_exists_user_active_quiz(user.id)
-    print(f"{title = }")
 
     if title is not None:
         text = await get_text("testing_quiz_active_not_stopped", {
@@ -87,12 +84,10 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
 
 
     link = message.text.split('_')[-1]
-    print(f"{link = }")
     if len(message.text.split(' ')) == 2:
         link = message.text.split(' ')[-1]
 
     quiz_part = await utils.get_quiz_part(link)
-    print(f"{quiz_part = }")
     try:
         await message.bot.edit_message_reply_markup(
             chat_id=message.chat.id,
@@ -107,7 +102,6 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
         return await message.answer(text)
 
     is_allowed = await check_user_role(user=user)
-    print(f"{is_allowed = }")
 
     if not is_allowed:
         text = await get_text("testing_not_allowed_role")
@@ -115,7 +109,6 @@ async def testing_link_handler(message: types.Message, state: FSMContext):
 
 
     players_count = await utils.get_user_quizzes_count(quiz_part.id)
-    print(f"{players_count = }")
     if players_count == 0:
         text = await get_text(
             'testing_quiz_part_info_not_answered',

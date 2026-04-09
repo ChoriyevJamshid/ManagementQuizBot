@@ -39,6 +39,7 @@ async def start_group_testing(group_quiz: GroupQuiz, bot: Bot):
     poll_question = await get_text("poll_question")
 
     await redis_group.set_quiz_active(quiz_id)
+    await redis_group.reset_question_answered(quiz_id)
 
     await run_group_quiz_loop(
         group_quiz=group_quiz,
