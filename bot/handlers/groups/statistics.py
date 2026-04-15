@@ -48,7 +48,7 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
     else:
         sorted_players = sorted(
             players.items(),
-            key=lambda item: (-item[1]["corrects"], item[1]["spent_time"])
+            key=lambda item: (-item[1]["corrects"], float(item[1]["spent_time"]))
         )
 
         os.makedirs(f"{settings.BASE_DIR}/trush", exist_ok=True)
