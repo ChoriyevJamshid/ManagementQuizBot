@@ -10,7 +10,7 @@ from quiz.tasks import group_quiz_create_file
 
 async def send_excel_to_user_callback(callback: types.CallbackQuery):
     try:
-        _, quiz_id = callback.data.split("_")
+        _, quiz_id = callback.data.split("_", 1)
     except (ValueError, AttributeError):
         return await callback.answer()
 

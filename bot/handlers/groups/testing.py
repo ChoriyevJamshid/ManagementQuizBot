@@ -25,12 +25,23 @@ async def start_group_testing(group_quiz: GroupQuiz, bot: Bot):
     """
     Entry point for starting group quiz testing.
     """
+    from quiz.choices import QuizStatus
+
     quiz_id = str(group_quiz.pk)
 
     await delete_quiz_reply_markup(group_quiz.group_id, group_quiz.message_id, bot)
 
     animation_msg_id = await animate_texts(group_quiz.group_id, bot)
     await bot.delete_message(group_quiz.group_id, animation_msg_id)
+
+    # Re-check DB status: quiz may have been stopped during the 10s countdown or animation.
+    # Without this, a stopped (CANCELED) quiz would re-activate via set_quiz_active below.
+    still_active = await GroupQuiz.objects.filter(
+        pk=group_quiz.pk,
+        status=QuizStatus.STARTED,
+    ).aexists()
+    if not still_active:
+        return
 
     # Generate once, store in Redis — prevents re-shuffle on continue
     question_data = await generate_user_quiz_data(group_quiz.part)
@@ -176,7 +187,8 @@ async def group_quiz_continue_callback(callback: types.CallbackQuery):
     await callback.answer()
 
     try:
-        _, group_id, index = callback.data.split("_")
+        parts = callback.data.split("_", 2)
+        _, group_id, index = parts
         index = int(index)
     except (ValueError, AttributeError):
         return

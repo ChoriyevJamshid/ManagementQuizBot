@@ -24,7 +24,7 @@ testing_group_quiz_part_ready_info_with_ready_counter = (
     '\n🖋 Savollar soni: <strong> {quantity} </strong>ta'
     '\n⏱️ Taymer: <strong> {timer} </strong>soniya\n '
     '\n🏁 Quizni boshlash uchun 2 kishi tayyor bo\'lishi kerak. '
-    'To\'xtatish uchun /<strong>stopQuiz </strong>buyrug\'irini yuboring. '
+    'To\'xtatish uchun /<strong>stop </strong>buyrug\'ini yuboring. '
     'Tayyor: <strong> {count} </strong>'
 )
 

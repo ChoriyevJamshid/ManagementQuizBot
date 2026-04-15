@@ -126,7 +126,7 @@ def prepare_router() -> Router:
 
     router.message.register(
         testing_stop_quiz_handler,
-        or_f(Command('stopQuiz'), Command('stop')),
+        Command('stop'),
     )
 
     router.message.register(

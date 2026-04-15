@@ -4,6 +4,7 @@ from aiogram import types
 from aiogram.enums import ChatMemberStatus
 
 from quiz.choices import QuizStatus
+from quiz.models import GroupQuiz
 
 from bot import utils
 from bot.keyboards import inline_kb
@@ -152,6 +153,25 @@ async def start_handler(message: types.Message):
             update_fields=["message_id", "part_id", "data", "user"]
         )
 
+        return
+
+    # STARTED but not active in Redis → stale record (server restart or race condition).
+    # Clean up silently and allow starting a fresh quiz.
+    if not await redis_group.is_quiz_active(str(group_quiz.pk)):
+        await GroupQuiz.objects.filter(
+            pk=group_quiz.pk,
+            status=QuizStatus.STARTED,
+        ).aupdate(status=QuizStatus.CANCELED)
+        await redis_group.delete_group_quiz_data(str(group_quiz.pk))
+        ready_msg = await send_quiz_ready_message(message, quiz_part)
+        await utils.create_group_quiz(
+            part_id=quiz_part.id,
+            user_id=user.id,
+            group_id=group_id,
+            message_id=str(ready_msg.message_id),
+            title=message.chat.title,
+            invite_link=message.chat.invite_link,
+        )
         return
 
     text = await get_text(

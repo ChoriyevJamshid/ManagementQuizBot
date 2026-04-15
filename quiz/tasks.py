@@ -47,8 +47,10 @@ def group_quiz_create_file(
 
     if os.path.exists(file_path):
         with open(file_path, 'rb') as file:
-            quiz.file.save("statistics.xlsx", file)
-            quiz.save(update_fields=['file', 'updated_at'])
+            # save=False prevents Django from calling quiz.save() internally,
+            # which would overwrite all fields (including 'data') without update_fields.
+            quiz.file.save("statistics.xlsx", file, save=False)
+        quiz.save(update_fields=['file', 'updated_at'])
         os.remove(file_path)
     else:
         print(f"File {file_path} not found")
