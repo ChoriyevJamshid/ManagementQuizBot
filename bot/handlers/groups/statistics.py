@@ -17,6 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
+
+    def get_total_time(player):
+        skips = max(0, quantity - player["corrects"] - player["wrongs"])
+        return player["spent_time"] + (timer * skips)
+
     group_quiz = await utils.get_group_quiz_no_prefetch(group_id=group_id)
     if not group_quiz:
         return
@@ -46,12 +51,10 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
             {"title": quiz.title}
         )
     else:
-        for k, v in players.items():
-            print(k, v, type(v["spent_time"]), type(v["corrects"]))
 
         sorted_players = sorted(
             players.items(),
-            key=lambda item: (-int(item[1]["corrects"]), float(item[1]["spent_time"]))
+            key=lambda item: (-int(item[1]["corrects"]), get_total_time(item[1]))
         )
 
         os.makedirs(f"{settings.BASE_DIR}/trush", exist_ok=True)
@@ -69,9 +72,9 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
         for index, (_, player) in enumerate(sorted_players[:50], start=1):
             username = player["username"]
             corrects = player["corrects"]
-            wrongs = player["wrongs"]
-            skips = max(0, quantity - corrects - wrongs)
-            spent_time = player["spent_time"] + (timer * skips)
+            # wrongs = player["wrongs"]
+            # skips = max(0, quantity - corrects - wrongs)
+            spent_time = player["spent_time"] #+ (timer * skips)
             formatted_time = reform_spent_time(spent_time)
             prefix = gifts.get(index, f"{index}.")
             lines.append(f"{prefix} {username} - {corrects} ({formatted_time})")
