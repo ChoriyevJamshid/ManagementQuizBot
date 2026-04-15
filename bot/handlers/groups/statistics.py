@@ -72,9 +72,9 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
         for index, (_, player) in enumerate(sorted_players[:50], start=1):
             username = player["username"]
             corrects = player["corrects"]
-            # wrongs = player["wrongs"]
-            # skips = max(0, quantity - corrects - wrongs)
-            spent_time = player["spent_time"] #+ (timer * skips)
+            wrongs = player["wrongs"]
+            skips = max(0, quantity - corrects - wrongs)
+            spent_time = player["spent_time"] + (timer * skips)
             formatted_time = reform_spent_time(spent_time)
             prefix = gifts.get(index, f"{index}.")
             lines.append(f"{prefix} {username} - {corrects} ({formatted_time})")
