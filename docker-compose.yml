@@ -7,12 +7,12 @@ services:
       - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data/
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf
     environment:
       - POSTGRES_USER=${DB_USER}
       - POSTGRES_PASSWORD=${DB_PASSWORD}
-      - POSTGRES_HOST=${DB_HOST}
       - POSTGRES_DB=${DB_NAME}
-      - POSTGRES_PORT=${DB_PORT}
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     restart: always
 
   pgbouncer:
@@ -31,7 +31,7 @@ services:
       - DEFAULT_POOL_SIZE=${DEFAULT_POOL_SIZE}
       - PGBOUNCER_HOST=${PGBOUNCER_HOST}
       - LISTEN_PORT=${PGBOUNCER_PORT}
-      - AUTH_TYPE=trust
+      - AUTH_TYPE=md5
     volumes:
       - ./pgbouncer_userlist.txt:/etc/pgbouncer/userlist.txt:ro
     depends_on:
