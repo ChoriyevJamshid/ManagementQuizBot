@@ -2,6 +2,8 @@ import hashlib
 import os
 from pathlib import Path
 from environs import Env
+from django.urls import reverse_lazy
+from django.utils.translation import gettext_lazy as _
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -27,7 +29,11 @@ WEBHOOK_URL = f"{WEB_DOMAIN}/{WEBHOOK_PATH}"
 # Application definition
 
 INSTALLED_APPS = [
-    'jazzmin',
+    'unfold',
+    'unfold.contrib.filters',
+    'unfold.contrib.forms',
+    'unfold.contrib.import_export',
+    'unfold.contrib.inlines',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -45,7 +51,6 @@ INSTALLED_APPS = [
     'common.apps.CommonConfig',
     'support.apps.SupportConfig',
     'quiz.apps.QuizConfig',
-
 ]
 
 MIDDLEWARE = [
@@ -211,234 +216,168 @@ CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
 
 INTERNAL_IPS = ["127.0.0.1"]
 
-JAZZMIN_SETTINGS = {
-    # title of the window (Will default to current_admin_site.site_title if absent or None)
-    "site_title": "Manager Quiz | Bot",
-
-    # Title on the login screen (19 chars max) (defaults to current_admin_site.site_header if absent or None)
-    "site_header": "Manager Quiz | Bot",
-
-    # Title on the brand (19 chars max) (defaults to current_admin_site.site_header if absent or None)
-    "site_brand": "Manager Quiz | Bot",
-
-    # Logo to use for your site, must be present in static files, used for brand on top left
-    "site_logo": "images/manager_quiz.jpg",
-
-    # Logo to use for your site, must be present in static files, used for login form logo (defaults to site_logo)
-    "login_logo": "images/manager_quiz.jpg",
-
-    # Logo to use for login form in dark themes (defaults to login_logo)
-    "login_logo_dark": None,
-
-    # CSS classes that are applied to the logo above
-    "site_logo_classes": "rounded-pill",
-
-    # Relative path to a favicon for your site, will default to site_logo if absent (ideally 32x32 px)
-    "site_icon": None,
-
-    # Welcome text on the login screen
-    "welcome_sign": "Welcome to the ManagerQuiz Bot Admin Panel",
-
-    # Copyright on the footer
-    "copyright": "Acme Library Ltd",
-
-    # List of model admins to search from the search bar, search bar omitted if excluded
-    # If you want to use a single search field you dont need to use a list, you can use a simple string
-    "search_model": ["quiz.Quiz", "quiz.Category"],
-
-    # Field name on user model that contains avatar ImageField/URLField/Charfield or a callable that receives the user
-    "user_avatar": None,
-
-    ############
-    # Top Menu #
-    ############
-
-    # Links to put along the top menu
-    "topmenu_links": [
-
-        # Url that gets reversed (Permissions can be added)
-        {
-            "name": "Home",
-            "url": "admin:index",
-            "icon": "fas fa-chart-line",
-            "permissions": ["auth.view_user"]
+UNFOLD = {
+    "SITE_TITLE": "Manager Quiz",
+    "SITE_HEADER": "Manager Quiz | Bot",
+    "SITE_SYMBOL": "quiz",
+    "SHOW_HISTORY": True,
+    "SHOW_VIEW_ON_SITE": True,
+    "DASHBOARD_CALLBACK": "dashboard.dashboard_callback",
+    "COLORS": {
+        "primary": {
+            "50": "238 242 255",
+            "100": "224 231 255",
+            "200": "199 210 254",
+            "300": "165 180 252",
+            "400": "129 140 248",
+            "500": "99 102 241",
+            "600": "79 70 229",
+            "700": "67 56 202",
+            "800": "55 48 163",
+            "900": "49 46 129",
+            "950": "30 27 75",
         },
-
-        # external url that opens in a new window (Permissions can be added)
-        # {"name": "Аналитика", "url": "admin-analytics", "new_window": False},
-
-        # model admin to link to (Permissions checked against model)
-        # {"model": "auth.User"},
-
-        # App with dropdown menu to all its models pages (Permissions checked against models)
-        {"app": "common"},
-        {"app": "quiz"},
-        {"app": "support"},
-    ],
-
-    #############
-    # User Menu #
-    #############
-
-    # Additional links to include in the user menu on the top right ("app" url type is not allowed)
-    # "usermenu_links": [
-    #     {"name": "Support", "url": "https://github.com/farridav/django-jazzmin/issues", "new_window": True},
-    #     {"model": "responder.TelegramUser"}
-    # ],
-
-    #############
-    # Side Menu #
-    #############
-
-    # Whether to display the side menu
-    "show_sidebar": True,
-
-    # Whether to aut expand the menu
-    "navigation_expanded": True,
-
-    # Hide these apps when generating side menu e.g (auth)
-    "hide_apps": [],
-
-    # Hide these models when generating side menu (e.g auth.user)
-    "hide_models": [
-        # 'django_celery_beat.SolarSchedule',
-        # 'django_celery_beat.IntervalSchedule',
-        # 'django_celery_beat.TzAwareCrontab',
-        # 'django_celery_beat.ClockedSchedule',
-    ],
-
-    # List of apps (and/or models) to base side menu ordering off of (does not need to contain all apps/models)
-    "order_with_respect_to": [
-        "auth",
-
-        "common",
-        "common.TelegramProfile",
-        "common.Language",
-        "common.Text",
-        "common.TextCode",
-        "common.Data",
-
-        "quiz",
-        "quiz.Category",
-        "quiz.CategoryPending",
-        "quiz.Quiz",
-        "quiz.QuizPart",
-        "quiz.Question",
-        "quiz.Option",
-        "quiz.UserQuiz",
-        "quiz.GroupQuiz",
-        "quiz.TelegramCommand",
-
-        "support",
-        "support.SupportMessage",
-    ],
-
-    "icons": {
-        "admin:index": "fas fa-gauge",
-
-        "auth": "fas fa-users-cog",
-        "auth.User": "fas fa-user-tie",
-        "auth.Permission": "fas fa-key",
-        "auth.Group": "fas fa-users",
-
-        "common.TelegramProfile": "fas fa-user",
-        "common.Language": "fas fa-language",
-        "common.Text": "fas fa-font",
-        "common.TextCode": "fas fa-barcode",
-        "common.Data": "fas fa-toolbox",
-
-        "quiz.Category": "fas fa-list",
-        "quiz.CategoryPending": "fas fa-thin fa-list",
-        "quiz.Quiz": "fas fa-square-poll-vertical",
-        "quiz.QuizPart": "fas fa-quote-right",
-        "quiz.Question": "fas fa-circle-question",
-        "quiz.Option": "fas fa-comments",
-        "quiz.UserQuiz": "fas fa-solid fa-book-journal-whills",
-        "quiz.GroupQuiz": "fas fa-book",
-        "quiz.TelegramCommand": "fas fa-terminal",
-
-        "support.SupportMessage": "fas fa-info",
-
-        "admin.LogEntry": "fas fa-file-pen",
-        "contenttypes.ContentType": "fas fa-keyboard",
-
-        "django_celery_beat.PeriodicTask": "fas fa-clock",
-        "django_celery_beat.IntervalSchedule": "fas fa-stopwatch",
-        "django_celery_beat.CrontabSchedule": "fas fa-calendar-alt",
-        "django_celery_beat.SolarSchedule": "fas fa-sun",
-        "django_celery_beat.ClockedSchedule": "fas fa-clock",
-        "django_celery_beat.PeriodicTasks": "fas fa-tasks",
-
-        "sessions.Session": "fas fa-user-clock",
-
     },
-    # Icons that are used when one is not manually specified
-    "default_icon_parents": "fas fa-chevron-circle-right",
-    "default_icon_children": "fas fa-circle",
-
-    #################
-    # Related Modal #
-    #################
-    # Use modals instead of popups
-    "related_modal_active": True,
-
-    #############
-    # UI Tweaks #
-    #############
-    # Relative paths to custom CSS/JS scripts (must be present in static files)
-    "custom_css": None,
-    "custom_js": None,
-    # Whether to link font from fonts.googleapis.com (use custom_css to supply font otherwise)
-    "use_google_fonts_cdn": True,
-    # Whether to show the UI customizer on the sidebar
-    "show_ui_builder": True,
-
-    ###############
-    # Change view #
-    ###############
-    # Render out the change view as a single form, or in tabs, current options are
-    # - single
-    # - horizontal_tabs (default)
-    # - vertical_tabs
-    # - collapsible
-    # - carousel
-    "changeform_format": "horizontal_tabs",
-    # override change forms on a per modeladmin basis
-    # "changeform_format_overrides": {"auth.user": "collapsible", "auth.group": "vertical_tabs"},
-    # Add a language dropdown into the admin
-    "language_chooser": False,
-}
-
-JAZZMIN_UI_TWEAKS = {
-    "navbar_small_text": False,
-    "footer_small_text": False,
-    "body_small_text": False,
-    "brand_small_text": False,
-    "brand_colour": "navbar-info",
-    "accent": "accent-info",
-    "navbar": "navbar-info navbar-dark",
-    "no_navbar_border": False,
-    "navbar_fixed": True,
-    "layout_boxed": False,
-    "footer_fixed": False,
-    "sidebar_fixed": True,
-    "sidebar": "sidebar-dark-info",
-    "sidebar_nav_small_text": False,
-    "sidebar_disable_expand": False,
-    "sidebar_nav_child_indent": False,
-    "sidebar_nav_compact_style": False,
-    "sidebar_nav_legacy_style": False,
-    "sidebar_nav_flat_style": False,
-    "theme": "united",
-    "dark_mode_theme": None,
-    "button_classes": {
-        "primary": "btn-primary",
-        "secondary": "btn-outline-secondary",
-        "info": "btn-info",
-        "warning": "btn-warning",
-        "danger": "btn-danger",
-        "success": "btn-outline-success"
-    }
+    "SIDEBAR": {
+        "show_search": True,
+        "show_all_applications": False,
+        "navigation": [
+            {
+                "title": _("General"),
+                "separator": False,
+                "items": [
+                    {
+                        "title": _("Dashboard"),
+                        "icon": "dashboard",
+                        "link": reverse_lazy("admin:index"),
+                    },
+                ],
+            },
+            {
+                "title": _("Users"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("Auth Users"),
+                        "icon": "manage_accounts",
+                        "link": reverse_lazy("admin:auth_user_changelist"),
+                    },
+                    {
+                        "title": _("Auth Groups"),
+                        "icon": "group",
+                        "link": reverse_lazy("admin:auth_group_changelist"),
+                    },
+                    {
+                        "title": _("Telegram Profiles"),
+                        "icon": "person",
+                        "link": reverse_lazy("admin:common_telegramprofile_changelist"),
+                        "badge": "dashboard.badge_new_users",
+                    },
+                ],
+            },
+            {
+                "title": _("Quiz"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("Categories"),
+                        "icon": "category",
+                        "link": reverse_lazy("admin:quiz_category_changelist"),
+                    },
+                    {
+                        "title": _("Pending Categories"),
+                        "icon": "pending",
+                        "link": reverse_lazy("admin:quiz_categorypending_changelist"),
+                    },
+                    {
+                        "title": _("Quizzes"),
+                        "icon": "quiz",
+                        "link": reverse_lazy("admin:quiz_quiz_changelist"),
+                    },
+                    {
+                        "title": _("Quiz Parts"),
+                        "icon": "article",
+                        "link": reverse_lazy("admin:quiz_quizpart_changelist"),
+                    },
+                    {
+                        "title": _("Questions"),
+                        "icon": "help",
+                        "link": reverse_lazy("admin:quiz_question_changelist"),
+                    },
+                    {
+                        "title": _("Options"),
+                        "icon": "checklist",
+                        "link": reverse_lazy("admin:quiz_option_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Sessions"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("User Quizzes"),
+                        "icon": "history_edu",
+                        "link": reverse_lazy("admin:quiz_userquiz_changelist"),
+                    },
+                    {
+                        "title": _("Group Quizzes"),
+                        "icon": "groups",
+                        "link": reverse_lazy("admin:quiz_groupquiz_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Bot"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("Bot Commands"),
+                        "icon": "terminal",
+                        "link": reverse_lazy("admin:quiz_telegramcommand_changelist"),
+                    },
+                    {
+                        "title": _("Bot Data"),
+                        "icon": "settings",
+                        "link": reverse_lazy("admin:common_data_changelist"),
+                    },
+                ],
+            },
+            {
+                "title": _("Support"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("Support Messages"),
+                        "icon": "support_agent",
+                        "link": reverse_lazy("admin:support_supportmessage_changelist"),
+                        "badge": "dashboard.badge_pending_support",
+                    },
+                ],
+            },
+            {
+                "title": _("Celery"),
+                "separator": True,
+                "items": [
+                    {
+                        "title": _("Periodic Tasks"),
+                        "icon": "schedule",
+                        "link": reverse_lazy("admin:django_celery_beat_periodictask_changelist"),
+                    },
+                    {
+                        "title": _("Crontab Schedules"),
+                        "icon": "calendar_month",
+                        "link": reverse_lazy("admin:django_celery_beat_crontabschedule_changelist"),
+                    },
+                    {
+                        "title": _("Interval Schedules"),
+                        "icon": "timer",
+                        "link": reverse_lazy("admin:django_celery_beat_intervalschedule_changelist"),
+                    },
+                ],
+            },
+        ],
+    },
 }
 
 LOGGING = {
