@@ -31,7 +31,7 @@ services:
       - DEFAULT_POOL_SIZE=${DEFAULT_POOL_SIZE}
       - PGBOUNCER_HOST=${PGBOUNCER_HOST}
       - LISTEN_PORT=${PGBOUNCER_PORT}
-      - AUTH_TYPE=md5
+      - AUTH_TYPE=trust
     volumes:
       - ./pgbouncer_userlist.txt:/etc/pgbouncer/userlist.txt:ro
     depends_on:
