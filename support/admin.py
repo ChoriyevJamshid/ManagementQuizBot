@@ -21,15 +21,15 @@ class SupportMessageAdmin(ModelAdmin):
 
     fieldsets = (
         ("Message", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("owner", "question", "status", "is_read"),
         }),
         ("Answer", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("answer",),
         }),
         ("Dates", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("created_at", "updated_at"),
         }),
     )

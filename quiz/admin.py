@@ -92,11 +92,11 @@ class QuizAdmin(ModelAdmin):
 
     fieldsets = (
         ("Quiz Info", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("owner", "category", "title", "file_id", "quantity", "timer", "privacy"),
         }),
         ("Dates", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("created_at", "updated_at"),
         }),
     )
@@ -118,11 +118,11 @@ class QuizPartAdmin(ModelAdmin):
 
     fieldsets = (
         ("Part Info", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("quiz", "title", "link", "quantity", "from_i", "to_i"),
         }),
         ("Dates", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("created_at", "updated_at"),
         }),
     )
@@ -145,11 +145,11 @@ class QuestionAdmin(ModelAdmin):
 
     fieldsets = (
         ("Question", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("part", "text"),
         }),
         ("Dates", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("created_at", "updated_at"),
         }),
     )
@@ -175,15 +175,15 @@ class UserQuizAdmin(ModelAdmin):
 
     fieldsets = (
         ("Session", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("part", "user", "status", "active"),
         }),
         ("Results", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("corrects", "wrongs", "skips", "times"),
         }),
         ("Dates", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("created_at", "updated_at"),
         }),
     )
@@ -213,19 +213,19 @@ class GroupQuizAdmin(ModelAdmin):
 
     fieldsets = (
         ("Session Info", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("part", "user", "title", "group_id", "status", "invite_link"),
         }),
         ("Stats", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("participant_count", "answers", "skips", "index", "is_answered"),
         }),
         ("Technical", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("poll_id", "message_id", "file", "data"),
         }),
         ("Dates", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("created_at", "updated_at"),
         }),
     )

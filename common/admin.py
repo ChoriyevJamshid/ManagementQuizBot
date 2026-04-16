@@ -13,11 +13,11 @@ class DataAdmin(ModelAdmin, SingletonModelAdmin):
     warn_unsaved_form = True
     fieldsets = (
         ("Bot Settings", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("username", "channel_id"),
         }),
         ("File Types & URLs", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("file_types", "video_urls"),
         }),
     )
@@ -41,11 +41,11 @@ class TelegramProfileAdmin(ModelAdmin, BaseImportExportModelAdmin):
 
     fieldsets = (
         ("Profile", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("chat_id", "username", "first_name", "last_name", "phone_number", "role", "is_registered"),
         }),
         ("Dates", {
-            "tab": True,
+            "classes": ("tab",),
             "fields": ("created_at", "updated_at"),
         }),
     )
