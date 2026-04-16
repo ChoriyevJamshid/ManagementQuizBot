@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.apps import apps
 from django.contrib import messages
 from unfold.admin import ModelAdmin, TabularInline
 
@@ -245,10 +244,3 @@ class TelegramCommandAdmin(ModelAdmin):
     search_fields = ("command", "description")
     ordering = ("order",)
     actions = (set_bot_commands_menu,)
-
-
-for model in apps.get_models():
-    try:
-        admin.site.register(model)
-    except admin.sites.AlreadyRegistered:
-        pass
