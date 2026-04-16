@@ -304,11 +304,6 @@ UNFOLD = {
                         "icon": "help",
                         "link": reverse_lazy("admin:quiz_question_changelist"),
                     },
-                    {
-                        "title": _("Options"),
-                        "icon": "checklist",
-                        "link": reverse_lazy("admin:quiz_option_changelist"),
-                    },
                 ],
             },
             {
