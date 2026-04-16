@@ -103,19 +103,17 @@ async def start_handler(message: types.Message):
     user = await utils.get_user(tg_user)
 
     quiz_part = await utils.get_quiz_part(link)
-
     if not quiz_part:
         return
 
-    group_id = str(message.chat.id)
-
-    group_quiz = await utils.get_group_quiz_no_prefetch(group_id=group_id)
 
     is_allowed = await check_user_role(user)
-
     if not is_allowed:
         text = await get_text("testing_not_allowed_role")
         return await message.answer(text)
+
+    group_id = str(message.chat.id)
+    group_quiz = await utils.get_group_quiz_no_prefetch(group_id=group_id)
 
     if not group_quiz:
         ready_msg = await send_quiz_ready_message(message, quiz_part)

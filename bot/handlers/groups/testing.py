@@ -238,10 +238,15 @@ async def testing_group_poll_answer_handler(poll_answer: types.PollAnswer):
         if not quiz_id:
             raise SkipHandler()
 
-        # Atomic first-answer detection via SETNX — only first caller triggers DB write
-        is_first = await redis_group.set_question_answered(quiz_id)
+        # Atomic first-answer detection via SETNX — only first caller triggers DB write.
+        # Key is scoped to poll_id so late answers from the previous question
+        # cannot steal the 'first answer' slot of the current question.
+        is_first = await redis_group.set_question_answered(quiz_id, poll_answer.poll_id)
         if is_first:
             await utils.update_group_quiz_answers(quiz_id)
+
+        # Always mark for skip detection (plain SET, no NX).
+        await redis_group.mark_answered_for_skip(quiz_id)
 
         # Get question metadata
         q_data = await redis_group.get_group_question_data(quiz_id)

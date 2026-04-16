@@ -186,15 +186,27 @@ async def get_questions_data(group_quiz_id: str) -> list | None:
 # IS_ANSWERED FLAG (atomic, per-question)
 # -----------------------------
 
-async def set_question_answered(group_quiz_id: str) -> bool:
+async def set_question_answered(group_quiz_id: str, poll_id: str) -> bool:
     """
-    Atomically marks the current question as answered.
+    Atomically marks a specific poll question as answered.
     Returns True only for the FIRST caller (via SET NX).
-    Subsequent callers get False — no duplicate DB writes.
+    Key is scoped to poll_id to prevent late answers from a previous question
+    stealing the 'first answer' slot of the next question.
     """
-    key = f"group_quiz:{group_quiz_id}:is_answered"
+    key = f"group_quiz:{group_quiz_id}:poll:{poll_id}:is_answered"
     result = await redis_client.set(key, "1", nx=True, ex=600)
     return result is not None
+
+
+async def mark_answered_for_skip(group_quiz_id: str) -> None:
+    """
+    Marks the current question as answered for skip detection.
+    Called on every poll answer (not just the first) — plain SET, no NX.
+    This is the flag checked by run_group_quiz_loop to decide whether to
+    increment the consecutive-skip counter.
+    """
+    key = f"group_quiz:{group_quiz_id}:is_answered"
+    await redis_client.set(key, "1", ex=600)
 
 
 async def is_question_answered(group_quiz_id: str) -> bool:
@@ -272,4 +284,8 @@ async def delete_group_quiz_data(group_quiz_id: str) -> None:
         f"group_quiz:{group_quiz_id}:active",
     ]
 
-    await redis_client.delete(*keys)
+    # Collect per-poll deduplication keys (group_quiz:{id}:poll:{poll_id}:is_answered)
+    poll_pattern = f"group_quiz:{group_quiz_id}:poll:*:is_answered"
+    poll_keys = [key async for key in redis_client.scan_iter(poll_pattern)]
+
+    await redis_client.delete(*keys, *poll_keys)
