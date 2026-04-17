@@ -88,7 +88,7 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
             "group_quiz_finished",
             {
                 "title": part.title,
-                "count": str(group_quiz.answers),
+                "count": str(group_quiz.index),
                 "users": users_text,
             }
         )

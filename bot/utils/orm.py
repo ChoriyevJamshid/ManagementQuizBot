@@ -113,7 +113,7 @@ async def get_group_quiz(group_id: str) -> quiz_models.GroupQuiz | None:
         ~models.Q(status__in=[QuizStatus.FINISHED, QuizStatus.CANCELED]) & models.Q(group_id=group_id),
     ).prefetch_related(
         "part__questions", "part__questions__options"
-    ).select_related('part', 'part__quiz', 'user').afirst()
+    ).select_related('part', 'part__quiz', 'user').order_by('-id').afirst()
     return group_quiz
 
 
@@ -121,7 +121,7 @@ async def get_group_quiz_no_prefetch(group_id: str) -> quiz_models.GroupQuiz | N
     """Lightweight fetch — no question prefetch. Use when questions are not needed."""
     return await quiz_models.GroupQuiz.objects.filter(
         ~models.Q(status__in=[QuizStatus.FINISHED, QuizStatus.CANCELED]) & models.Q(group_id=group_id),
-    ).select_related('part', 'part__quiz', 'user').afirst()
+    ).select_related('part', 'part__quiz', 'user').order_by('-id').afirst()
 
 
 async def get_group_quiz_by_poll_id(poll_id: str) -> quiz_models.GroupQuiz | None:
