@@ -90,6 +90,8 @@ async def run_group_quiz_loop(
                 skips = await redis_group.increment_skips(quiz_id)
                 if skips >= 2:
                     return await handle_no_answers(group_quiz, index, bot)
+            else:
+                await redis_group.reset_skips(quiz_id)
             # Reset flag for the upcoming question
             await redis_group.reset_question_answered(quiz_id)
 

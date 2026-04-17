@@ -43,6 +43,10 @@ services:
     image: redis:7
     container_name: manager_bot_redis
     restart: always
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - ./redis.conf:/usr/local/etc/redis/redis.conf
+      - redis_data:/data
 
   django:
     build:
@@ -124,6 +128,7 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
   logs:
 
 

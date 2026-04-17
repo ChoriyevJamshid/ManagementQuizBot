@@ -165,11 +165,10 @@ async def update_group_quiz(group_quiz):
 
 async def update_group_quiz_answers(group_quiz_id):
     """Increments the answer counter. Called only once per question (first answer wins via Redis SETNX).
-    Capped at part.quiz.quantity so answers never exceeds total question count."""
-    return await GroupQuiz.objects.filter(
-        pk=group_quiz_id,
-        answers__lt=models.F("part__quiz__quantity"),
-    ).aupdate(answers=models.F("answers") + 1)
+    No DB-level cap needed — SETNX per poll_id already guarantees at most 1 call per question."""
+    await GroupQuiz.objects.filter(pk=group_quiz_id).aupdate(
+        answers=models.F("answers") + 1
+    )
 
 
 async def add_or_check_chat(chat_id: int):
