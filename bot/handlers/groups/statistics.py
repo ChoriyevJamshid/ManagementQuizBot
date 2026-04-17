@@ -38,6 +38,9 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
     if not updated:
         return
 
+    # Refresh to get the latest answers/index counts after all poll handlers complete.
+    await group_quiz.arefresh_from_db(fields=["answers", "index"])
+
     players = await redis_group.get_all_players_data(str(group_quiz.pk))
 
     part = group_quiz.part
