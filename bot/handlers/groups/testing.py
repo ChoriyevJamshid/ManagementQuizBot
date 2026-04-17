@@ -244,11 +244,6 @@ async def testing_group_poll_answer_handler(poll_answer: types.PollAnswer):
         # Key is scoped to poll_id so late answers from the previous question
         # cannot steal the 'first answer' slot of the current question.
         is_first = await redis_group.set_question_answered(quiz_id, poll_answer.poll_id)
-        logger.info("[poll_answer] quiz_id=%r poll_id=%r is_first=%s user=%s",
-                    quiz_id, poll_answer.poll_id, is_first,
-                    getattr(poll_answer.user, 'id', None))
-        if is_first:
-            await utils.update_group_quiz_answers(quiz_id)
 
         # Always mark for skip detection (plain SET, no NX).
         await redis_group.mark_answered_for_skip(quiz_id)

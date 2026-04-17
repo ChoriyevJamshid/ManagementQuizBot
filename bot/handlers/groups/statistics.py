@@ -112,10 +112,11 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
         group_quiz.data["players"] = players
 
     group_quiz.participant_count = len(players) if players else 0
+    group_quiz.answers = group_quiz.index
 
     try:
         await group_quiz.asave(
-            update_fields=["data", "participant_count", "updated_at"]
+            update_fields=["data", "participant_count", "answers", "updated_at"]
         )
     except Exception:
         logger.exception("Failed to persist group_quiz %s after statistics", group_quiz.pk)
