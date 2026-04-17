@@ -1,0 +1,6 @@
+{% extends "admin/change_form.html" %}
+{% load i18n admin_urls %}
+
+{% block breadcrumbs %}
+{% if not skip_object_list_page %}{{ block.super }}{% endif %}
+{% endblock %}
