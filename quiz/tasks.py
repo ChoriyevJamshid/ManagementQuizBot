@@ -28,21 +28,22 @@ def get_group_invite_link(pk: int):
 def group_quiz_create_file(
         quiz_id: int,
         file_path: str,
-        sorted_players: list | tuple, quantity: int
+        sorted_players: list | tuple,
+        quantity: int,
+        timer: int = 0,
 ):
-    quiz  = GroupQuiz.objects.filter(pk=quiz_id).first()
+    quiz = GroupQuiz.objects.filter(pk=quiz_id).first()
     if not quiz:
         return None
 
     if quiz.file:
-        print(f"File exists for quiz {quiz_id}")
         return None
-
 
     create_excel_statistics(
         file_path=file_path,
         sorted_players=sorted_players,
-        quantity=quantity
+        quantity=quantity,
+        timer=timer,
     )
 
     if os.path.exists(file_path):

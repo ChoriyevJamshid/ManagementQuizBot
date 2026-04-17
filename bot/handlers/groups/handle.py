@@ -41,12 +41,14 @@ async def send_excel_to_user_callback(callback: types.CallbackQuery):
         )
 
         quantity = min(group_quiz.part.quiz.quantity, group_quiz.index)
+        timer = group_quiz.part.quiz.timer
 
         group_quiz_create_file.delay(
             file_path=f"{settings.BASE_DIR}/trush/{group_quiz.pk}.xlsx",
             sorted_players=sorted_players,
             quantity=quantity,
             quiz_id=group_quiz.pk,
+            timer=timer,
         )
         return
 

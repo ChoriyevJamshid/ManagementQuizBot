@@ -244,6 +244,7 @@ def create_excel_statistics(
         file_path: str,
         sorted_players: list | tuple,
         quantity: int,
+        timer: int = 0,
 ):
     cols_name = {
         'name': "FIO",
@@ -254,16 +255,23 @@ def create_excel_statistics(
     }
     excel_data = []
     for _, player_data in sorted_players:
-        if player_data.get('spent_time', 0) == 0:
+        corrects = player_data.get('corrects', 0)
+        wrongs = player_data.get('wrongs', 0)
+        raw_time = player_data.get('spent_time', 0)
+
+        if corrects == 0 and wrongs == 0:
             continue
 
-        percent = round(player_data.get('corrects', 0) / quantity * 100, 2)
-        formatted_time = reform_spent_time(player_data.get('spent_time'))
+        skips = max(0, quantity - corrects - wrongs)
+        total_time = raw_time + (timer * skips)
+
+        percent = round(corrects / quantity * 100, 2) if quantity else 0
+        formatted_time = reform_spent_time(total_time)
 
         excel_data.append({
             cols_name["name"]: player_data.get('username'),
-            cols_name["corrects"]: player_data.get('corrects'),
-            cols_name["wrongs"]: player_data.get('wrongs'),
+            cols_name["corrects"]: corrects,
+            cols_name["wrongs"]: wrongs,
             cols_name["spent_time"]: formatted_time,
             cols_name["percent"]: f"{percent}%",
         })

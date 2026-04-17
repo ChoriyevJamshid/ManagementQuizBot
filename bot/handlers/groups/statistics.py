@@ -67,6 +67,7 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
             sorted_players=sorted_players,
             quantity=quantity,
             quiz_id=group_quiz.pk,
+            timer=timer,
         )
 
         gifts = {1: "🥇", 2: "🥈", 3: "🥉"} # 4: "🏅"
