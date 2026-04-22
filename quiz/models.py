@@ -152,7 +152,7 @@ class GroupQuiz(BaseModel):
     def save(self, *args, **kwargs):
         if not self.data:
             self.data = {}
-        super().save()
+        super().save(*args, **kwargs)
 
 
 class TelegramCommand(BaseModel):

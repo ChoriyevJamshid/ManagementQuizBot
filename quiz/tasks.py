@@ -1,6 +1,7 @@
 import os
 from celery import shared_task
 from django.conf import settings
+from django.core.files.base import ContentFile
 from quiz.models import GroupQuiz, Quiz
 
 from bot.utils.methods import get_chat, send_text
@@ -27,7 +28,6 @@ def get_group_invite_link(pk: int):
 @shared_task
 def group_quiz_create_file(
         quiz_id: int,
-        file_path: str,
         sorted_players: list | tuple,
         quantity: int,
         timer: int = 0,
@@ -39,22 +39,14 @@ def group_quiz_create_file(
     if quiz.file:
         return None
 
-    create_excel_statistics(
-        file_path=file_path,
+    file_bytes = create_excel_statistics(
         sorted_players=sorted_players,
         quantity=quantity,
         timer=timer,
     )
 
-    if os.path.exists(file_path):
-        with open(file_path, 'rb') as file:
-            # save=False prevents Django from calling quiz.save() internally,
-            # which would overwrite all fields (including 'data') without update_fields.
-            quiz.file.save("statistics.xlsx", file, save=False)
-        quiz.save(update_fields=['file', 'updated_at'])
-        os.remove(file_path)
-    else:
-        print(f"File {file_path} not found")
+    quiz.file.save("statistics.xlsx", ContentFile(file_bytes), save=False)
+    quiz.save(update_fields=['file', 'updated_at'])
 
     return None
 

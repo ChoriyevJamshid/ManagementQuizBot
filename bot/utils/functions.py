@@ -1,4 +1,5 @@
 import asyncio
+import io
 import logging
 import orjson
 import docx
@@ -240,12 +241,23 @@ def reform_spent_time(spent_time: float | int) -> str:
     return f"{seconds} sec"
 
 
+def sort_players(players: dict, quantity: int, timer: int) -> list:
+    """Sort players by corrects desc, then total time asc (with skip-time penalty)."""
+    def get_total_time(player):
+        skips = max(0, quantity - player["corrects"] - player["wrongs"])
+        return player["spent_time"] + (timer * skips)
+
+    return sorted(
+        players.items(),
+        key=lambda item: (-int(item[1]["corrects"]), get_total_time(item[1]))
+    )
+
+
 def create_excel_statistics(
-        file_path: str,
         sorted_players: list | tuple,
         quantity: int,
         timer: int = 0,
-):
+) -> bytes:
     cols_name = {
         'name': "FIO",
         'corrects': "To'g'ri javoblar",
@@ -258,9 +270,6 @@ def create_excel_statistics(
         corrects = player_data.get('corrects', 0)
         wrongs = player_data.get('wrongs', 0)
         raw_time = player_data.get('spent_time', 0)
-
-        if corrects == 0 and wrongs == 0:
-            continue
 
         skips = max(0, quantity - corrects - wrongs)
         total_time = raw_time + (timer * skips)
@@ -277,7 +286,9 @@ def create_excel_statistics(
         })
 
     df = pd.DataFrame(excel_data, columns=list(cols_name.values()))
-    df.to_excel(file_path, index=False)
+    buffer = io.BytesIO()
+    df.to_excel(buffer, index=False)
+    return buffer.getvalue()
 
 
 

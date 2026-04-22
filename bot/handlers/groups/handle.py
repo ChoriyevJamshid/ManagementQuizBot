@@ -1,11 +1,25 @@
+import asyncio
+import logging
 import os
+
 from aiogram import types
-from django.conf import settings
+from asgiref.sync import sync_to_async
+from django.core.files.base import ContentFile
 from django.utils.timezone import now
 
 from bot import utils
-from bot.utils.functions import get_text
-from quiz.tasks import group_quiz_create_file
+from bot.utils.functions import create_excel_statistics, get_text, sort_players
+
+logger = logging.getLogger(__name__)
+
+
+@sync_to_async
+def _save_excel_to_server(group_quiz_pk: int, file_bytes: bytes) -> None:
+    from quiz.models import GroupQuiz
+    quiz = GroupQuiz.objects.filter(pk=group_quiz_pk).first()
+    if quiz and not quiz.file:
+        quiz.file.save("statistics.xlsx", ContentFile(file_bytes), save=False)
+        quiz.save(update_fields=["file", "updated_at"])
 
 
 async def send_excel_to_user_callback(callback: types.CallbackQuery):
@@ -24,46 +38,40 @@ async def send_excel_to_user_callback(callback: types.CallbackQuery):
         text = await get_text("subscribe_to_bot_before_get_statistics")
         return await callback.answer(text, show_alert=True)
 
-    if not group_quiz.file:
-        text = await get_text("group_quiz_no_file_please_wait")
-        await callback.answer(text, show_alert=True)
+    file_name = f"statistics_{now().date()}.xlsx"
 
-        players = {}
-        if isinstance(group_quiz.data, dict):
-            players = group_quiz.data.get("players", {})
+    # Serve from server if the file is already saved
+    if group_quiz.file:
+        try:
+            file_path = group_quiz.file.path
+            if os.path.exists(file_path):
+                await callback.bot.send_document(
+                    chat_id=callback.from_user.id,
+                    document=types.FSInputFile(file_path, filename=file_name),
+                )
+                text = await get_text("statistics_file_sent")
+                return await callback.answer(text, show_alert=True)
+        except Exception:
+            logger.exception("Failed to serve statistics file for quiz %s", quiz_id)
 
-        if not players:
-            return
+    # File not on server yet — generate from saved player data
+    players = group_quiz.data.get("players", {}) if isinstance(group_quiz.data, dict) else {}
 
-        sorted_players = sorted(
-            players.items(),
-            key=lambda item: (-item[1]["corrects"], item[1]["spent_time"])
-        )
-
-        quantity = min(group_quiz.part.quiz.quantity, group_quiz.index)
-        timer = group_quiz.part.quiz.timer
-
-        group_quiz_create_file.delay(
-            file_path=f"{settings.BASE_DIR}/trush/{group_quiz.pk}.xlsx",
-            sorted_players=sorted_players,
-            quantity=quantity,
-            quiz_id=group_quiz.pk,
-            timer=timer,
-        )
-        return
-
-    file_path = group_quiz.file.path
-
-    if not os.path.exists(file_path):
+    if not players:
         text = await get_text("group_quiz_no_file_please_wait")
         return await callback.answer(text, show_alert=True)
 
-    file_name = f"statistics_{now().date()}.xlsx"
+    quantity = group_quiz.index if group_quiz.index > 0 else group_quiz.part.quiz.quantity
+    timer = group_quiz.part.quiz.timer
+    sorted_players = sort_players(players, quantity, timer)
+
+    file_bytes = await asyncio.to_thread(create_excel_statistics, sorted_players, quantity, timer)
 
     await callback.bot.send_document(
         chat_id=callback.from_user.id,
-        document=types.FSInputFile(file_path, filename=file_name)
+        document=types.BufferedInputFile(file_bytes, filename=file_name),
     )
-
     text = await get_text("statistics_file_sent")
-    return await callback.answer(text, show_alert=True)
+    await callback.answer(text, show_alert=True)
+
+    asyncio.create_task(_save_excel_to_server(group_quiz.pk, file_bytes))

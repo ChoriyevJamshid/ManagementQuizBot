@@ -1,7 +1,5 @@
-import os
 import logging
 
-from django.conf import settings
 from aiogram import Bot
 
 from quiz.choices import QuizStatus
@@ -9,7 +7,7 @@ from quiz.models import GroupQuiz
 
 from bot import utils
 from bot.keyboards import inline_kb
-from bot.utils.functions import get_text, get_texts, reform_spent_time
+from bot.utils.functions import get_text, get_texts, reform_spent_time, sort_players
 from bot.utils import redis_group
 from quiz.tasks import group_quiz_create_file
 
@@ -17,10 +15,6 @@ logger = logging.getLogger(__name__)
 
 
 async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
-
-    def get_total_time(player):
-        skips = max(0, quantity - player["corrects"] - player["wrongs"])
-        return player["spent_time"] + (timer * skips)
 
     group_quiz = await utils.get_group_quiz_no_prefetch(group_id=group_id)
     if not group_quiz:
@@ -55,15 +49,9 @@ async def send_statistics(group_id: str, bot: Bot, is_cancelled: bool = False):
         )
     else:
 
-        sorted_players = sorted(
-            players.items(),
-            key=lambda item: (-int(item[1]["corrects"]), get_total_time(item[1]))
-        )
-
-        os.makedirs(f"{settings.BASE_DIR}/trush", exist_ok=True)
+        sorted_players = sort_players(players, quantity, timer)
 
         group_quiz_create_file.delay(
-            file_path=f"{settings.BASE_DIR}/trush/{group_quiz.pk}.xlsx",
             sorted_players=sorted_players,
             quantity=quantity,
             quiz_id=group_quiz.pk,
