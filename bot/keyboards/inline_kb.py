@@ -71,7 +71,7 @@ async def get_quizzes_markup(quiz_data: dict, state: FSMContext):
 async def quiz_detail_markup(quiz):
     builder = InlineKeyboardBuilder()
 
-    texts = await get_texts(('edit_timer_button', 'edit_privacy_button', 'turn_on', 'turn_off'))
+    texts = await get_texts(('edit_timer_button', 'edit_privacy_button', 'turn_on', 'turn_off', 'schedule_button'))
 
     builder.add(InlineKeyboardButton(
         text=f'{texts["edit_timer_button"]}', callback_data=f"quiz-list-edit-timer_{quiz.id}"
@@ -84,9 +84,84 @@ async def quiz_detail_markup(quiz):
     ))
 
     builder.add(InlineKeyboardButton(
+        text=texts['schedule_button'], callback_data=f"quiz-schedule_{quiz.id}"
+    ))
+
+    builder.add(InlineKeyboardButton(
         text='🔙', callback_data=f"quiz-list-back-user-quizzes"
     ))
     return builder.adjust(*(1,)).as_markup()
+
+
+async def schedule_parts_markup(quiz_parts: list):
+    builder = InlineKeyboardBuilder()
+    for part in quiz_parts:
+        builder.add(InlineKeyboardButton(
+            text=f"[{part.from_i} - {part.to_i}]",
+            callback_data=f"schedule-part_{part.id}"
+        ))
+    back_text = await get_text('back_text')
+    builder.add(InlineKeyboardButton(text=back_text, callback_data="schedule-back-to-quiz-detail"))
+    return builder.adjust(2, 1).as_markup()
+
+
+async def schedule_groups_markup(groups: list):
+    builder = InlineKeyboardBuilder()
+    for i, g in enumerate(groups):
+        title = g.get('title') or g.get('group_id', '')
+        builder.add(InlineKeyboardButton(
+            text=f"📌 {title}",
+            callback_data=f"schedule-group-idx_{i}"
+        ))
+    texts = await get_texts(('schedule_other_group', 'back_text'))
+    builder.add(InlineKeyboardButton(text=texts['schedule_other_group'], callback_data="schedule-group-manual"))
+    builder.add(InlineKeyboardButton(text=texts['back_text'], callback_data="schedule-back-to-parts"))
+    return builder.adjust(1).as_markup()
+
+
+async def schedule_type_markup():
+    texts = await get_texts(('schedule_one_time', 'schedule_periodic', 'back_text'))
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text=texts['schedule_one_time'], callback_data="schedule-type-onetime"))
+    builder.add(InlineKeyboardButton(text=texts['schedule_periodic'], callback_data="schedule-type-periodic"))
+    builder.add(InlineKeyboardButton(text=texts['back_text'], callback_data="schedule-back-to-groups"))
+    return builder.adjust(1).as_markup()
+
+
+async def schedule_days_markup():
+    texts = await get_texts((
+        'schedule_days_every', 'schedule_days_weekdays',
+        'schedule_day_mon', 'schedule_day_tue', 'schedule_day_wed',
+        'schedule_day_thu', 'schedule_day_fri', 'schedule_day_sat',
+        'schedule_day_sun', 'back_text',
+    ))
+    days = [
+        ('*', texts['schedule_days_every']),
+        ('1,2,3,4,5', texts['schedule_days_weekdays']),
+        ('1', texts['schedule_day_mon']),
+        ('2', texts['schedule_day_tue']),
+        ('3', texts['schedule_day_wed']),
+        ('4', texts['schedule_day_thu']),
+        ('5', texts['schedule_day_fri']),
+        ('6', texts['schedule_day_sat']),
+        ('0', texts['schedule_day_sun']),
+    ]
+    builder = InlineKeyboardBuilder()
+    for value, label in days:
+        builder.add(InlineKeyboardButton(
+            text=label,
+            callback_data=f"schedule-days_{value}"
+        ))
+    builder.add(InlineKeyboardButton(text=texts['back_text'], callback_data="schedule-back-to-type"))
+    return builder.adjust(2, 2, 2, 2, 1, 1).as_markup()
+
+
+async def schedule_confirm_markup():
+    texts = await get_texts(('schedule_confirm_btn', 'schedule_cancel_btn'))
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text=texts['schedule_confirm_btn'], callback_data="schedule-confirm"))
+    builder.add(InlineKeyboardButton(text=texts['schedule_cancel_btn'], callback_data="schedule-cancel"))
+    return builder.adjust(2).as_markup()
 
 
 async def quiz_detail_edit_privacy_markup(quiz: dict, texts: dict):

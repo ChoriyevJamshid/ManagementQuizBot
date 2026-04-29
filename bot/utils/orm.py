@@ -164,6 +164,107 @@ async def update_group_quiz(group_quiz):
 
 
 
+async def get_distinct_groups(limit: int = 10) -> list:
+    from asgiref.sync import sync_to_async
+
+    def _inner():
+        seen = {}
+        qs = quiz_models.GroupQuiz.objects.values('group_id', 'title').order_by('-created_at')[:limit * 5]
+        for gq in qs:
+            gid = gq['group_id']
+            if gid not in seen:
+                seen[gid] = gq.get('title') or gid
+            if len(seen) >= limit:
+                break
+        return [{'group_id': k, 'title': v} for k, v in seen.items()]
+
+    return await sync_to_async(_inner)()
+
+
+async def create_scheduled_quiz(
+    quiz_part_id: int,
+    created_by_id: int,
+    group_id: str,
+    group_title: str,
+    is_periodic: bool,
+    hour: int,
+    minute: int,
+    days_of_week: str,
+    start_date,
+):
+    from asgiref.sync import sync_to_async
+
+    def _inner():
+        import json
+        import pytz
+        from datetime import datetime, timedelta
+        from django_celery_beat.models import CrontabSchedule, ClockedSchedule, PeriodicTask
+        from quiz.models import ScheduledQuiz
+
+        scheduled = ScheduledQuiz.objects.create(
+            quiz_part_id=quiz_part_id,
+            created_by_id=created_by_id,
+            group_id=group_id,
+            group_title=group_title,
+            is_periodic=is_periodic,
+            hour=hour,
+            minute=minute,
+            days_of_week=days_of_week,
+            start_date=start_date,
+        )
+
+        task_hour = hour - 1 if hour > 0 else 23
+        task_day = days_of_week
+
+        # If quiz is at 00:xx, task runs at 23:xx previous day → shift days back by 1
+        if hour == 0 and is_periodic and task_day != '*':
+            days = [int(d) for d in task_day.split(',')]
+            shifted = [(d - 1) % 7 for d in days]
+            task_day = ','.join(map(str, sorted(shifted)))
+
+        task_kwargs = json.dumps({"scheduled_quiz_id": scheduled.pk})
+        task_name = f"scheduled_quiz_{scheduled.pk}"
+
+        if is_periodic:
+            schedule, _ = CrontabSchedule.objects.get_or_create(
+                minute=str(minute),
+                hour=str(task_hour),
+                day_of_week=task_day,
+                day_of_month='*',
+                month_of_year='*',
+                timezone='Asia/Tashkent',
+            )
+            periodic_task = PeriodicTask.objects.create(
+                crontab=schedule,
+                name=task_name,
+                task='quiz.tasks.run_scheduled_quiz',
+                kwargs=task_kwargs,
+                enabled=True,
+            )
+        else:
+            tz = pytz.timezone('Asia/Tashkent')
+            quiz_dt = tz.localize(datetime(
+                start_date.year, start_date.month, start_date.day,
+                hour, minute,
+            ))
+            task_dt_utc = (quiz_dt - timedelta(hours=1)).astimezone(pytz.UTC).replace(tzinfo=None)
+            clocked, _ = ClockedSchedule.objects.get_or_create(clocked_time=task_dt_utc)
+            periodic_task = PeriodicTask.objects.create(
+                clocked=clocked,
+                name=task_name,
+                task='quiz.tasks.run_scheduled_quiz',
+                kwargs=task_kwargs,
+                enabled=True,
+                one_off=True,
+            )
+
+        scheduled.periodic_task = periodic_task
+        scheduled.save(update_fields=['periodic_task'])
+        return scheduled
+
+    return await sync_to_async(_inner)()
+
+
 async def add_or_check_chat(chat_id: int):
     data_obj = com_models.Data.get_solo()
     data_obj.channel_id = chat_id
