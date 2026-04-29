@@ -244,3 +244,92 @@ class TelegramCommandAdmin(ModelAdmin):
     search_fields = ("command", "description")
     ordering = ("order",)
     actions = (set_bot_commands_menu,)
+
+
+@admin.action(description="Activate selected schedules")
+def activate_schedules(modeladmin, request, queryset):
+    queryset.update(is_active=True)
+    from django_celery_beat.models import PeriodicTask
+    PeriodicTask.objects.filter(
+        scheduled_quiz__in=queryset
+    ).update(enabled=True)
+    modeladmin.message_user(request, "Selected schedules activated.", level=messages.SUCCESS)
+
+
+@admin.action(description="Deactivate selected schedules")
+def deactivate_schedules(modeladmin, request, queryset):
+    queryset.update(is_active=False)
+    from django_celery_beat.models import PeriodicTask
+    PeriodicTask.objects.filter(
+        scheduled_quiz__in=queryset
+    ).update(enabled=False)
+    modeladmin.message_user(request, "Selected schedules deactivated.", level=messages.SUCCESS)
+
+
+@admin.register(models.ScheduledQuiz)
+class ScheduledQuizAdmin(ModelAdmin):
+    compressed_fields = True
+    warn_unsaved_form = True
+    list_filter_submit = True
+
+    list_display = (
+        "id", "quiz_part_display", "group_title", "group_id",
+        "schedule_type_display", "time_display", "days_display",
+        "created_by", "is_active", "created_at",
+    )
+    list_display_links = ("id", "quiz_part_display")
+    list_editable = ("is_active",)
+    list_filter = ("is_periodic", "is_active")
+    search_fields = ("group_id", "group_title", "quiz_part__quiz__title", "created_by__username", "created_by__first_name")
+    date_hierarchy = "created_at"
+    list_per_page = 25
+    readonly_fields = ("periodic_task", "created_at", "updated_at")
+    actions = (activate_schedules, deactivate_schedules)
+
+    fieldsets = (
+        ("Main", {
+            "classes": ("tab",),
+            "fields": ("created_by", "quiz_part", "group_id", "group_title", "is_active"),
+        }),
+        ("Schedule", {
+            "classes": ("tab",),
+            "fields": ("is_periodic", "hour", "minute", "days_of_week", "start_date"),
+        }),
+        ("Technical", {
+            "classes": ("tab",),
+            "fields": ("periodic_task",),
+        }),
+        ("Dates", {
+            "classes": ("tab",),
+            "fields": ("created_at", "updated_at"),
+        }),
+    )
+
+    @admin.display(description="Quiz Part")
+    def quiz_part_display(self, obj):
+        return f"{obj.quiz_part.quiz.title} [{obj.quiz_part.from_i}–{obj.quiz_part.to_i}]"
+
+    @admin.display(description="Type")
+    def schedule_type_display(self, obj):
+        return "🔄 Davriy" if obj.is_periodic else "📌 Bir martalik"
+
+    @admin.display(description="Time")
+    def time_display(self, obj):
+        return f"{obj.hour:02d}:{obj.minute:02d}"
+
+    @admin.display(description="Days")
+    def days_display(self, obj):
+        if not obj.is_periodic:
+            return str(obj.start_date) if obj.start_date else "—"
+        mapping = {
+            '*': 'Har kuni',
+            '1,2,3,4,5': 'Du–Ju',
+            '0': 'Yakshanba', '1': 'Dushanba', '2': 'Seshanba',
+            '3': 'Chorshanba', '4': 'Payshanba', '5': 'Juma', '6': 'Shanba',
+        }
+        return mapping.get(obj.days_of_week, obj.days_of_week)
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related(
+            "created_by", "quiz_part", "quiz_part__quiz", "periodic_task"
+        )
