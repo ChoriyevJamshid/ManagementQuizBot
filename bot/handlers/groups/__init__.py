@@ -21,11 +21,6 @@ def prepare_router() -> Router:
     )
 
     router.callback_query.register(
-        get_ready_callback_handler,
-        F.data.startswith("group-ready")
-    )
-
-    router.callback_query.register(
         group_quiz_continue_callback,
         F.data.startswith("testing-group-continue-quiz")
     )

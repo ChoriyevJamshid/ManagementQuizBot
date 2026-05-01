@@ -329,23 +329,6 @@ async def admin_menu_markup(texts: dict):
     return builder.adjust(*(1, 1)).as_markup()
 
 
-# group handlers keyboards
-
-
-async def group_ready_markup(group_id: str):
-    text = await get_text('testing_ready_button')
-
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [
-                InlineKeyboardButton(
-                    text=text,
-                    callback_data=f"group-ready_{group_id}"
-                )
-            ]
-        ]
-    )
-
 
 async def test_group_continue_markup(group_id: str, index: int):
     text = await get_text('testing_continue_button')

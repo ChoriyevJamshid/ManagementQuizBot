@@ -16,33 +16,6 @@ _QUIZ_TTL = 86400  # 24 hours
 
 
 # -----------------------------
-# PLAYERS
-# -----------------------------
-
-async def add_player_to_group_quiz(group_quiz_id: str, user_id: str, username: str) -> None:
-    """
-    Adds player to quiz if not exists.
-    """
-    players_key = f"group_quiz:{group_quiz_id}:players"
-    usernames_key = f"group_quiz:{group_quiz_id}:usernames"
-
-    pipe = redis_client.pipeline()
-    pipe.sadd(players_key, user_id)
-    pipe.hset(usernames_key, user_id, username)
-    pipe.expire(players_key, _QUIZ_TTL)
-    pipe.expire(usernames_key, _QUIZ_TTL)
-    await pipe.execute()
-
-
-async def get_players_count(group_quiz_id: str) -> int:
-    """
-    Returns players count.
-    """
-    players_key = f"group_quiz:{group_quiz_id}:players"
-    return await redis_client.scard(players_key)
-
-
-# -----------------------------
 # SCORING
 # -----------------------------
 

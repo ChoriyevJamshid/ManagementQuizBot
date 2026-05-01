@@ -126,15 +126,6 @@ def start_scheduled_group_quiz(scheduled_quiz_id: int):
         return
 
     quiz_part = scheduled.quiz_part
-    ready_button_text = get_text_sync('testing_ready_button')
-    reply_markup = {
-        "inline_keyboard": [[
-            {
-                "text": ready_button_text,
-                "callback_data": f"group-ready_{scheduled.group_id}",
-            }
-        ]]
-    }
 
     text = get_text_sync('testing_group_quiz_part_ready_info', {
         "from_i": str(quiz_part.from_i),
@@ -144,23 +135,28 @@ def start_scheduled_group_quiz(scheduled_quiz_id: int):
         "title": str(quiz_part.title or quiz_part.quiz.title),
     })
 
-    response = send_text(
-        chat_id=int(scheduled.group_id),
-        text=text,
-        reply_markup=reply_markup,
-    )
+    response = send_text(chat_id=int(scheduled.group_id), text=text)
     if response.status_code != 200:
         return
 
     message_id = str(response.json()['result']['message_id'])
 
-    GroupQuiz.objects.create(
+    group_quiz = GroupQuiz.objects.create(
         part=quiz_part,
         user=scheduled.created_by,
         group_id=scheduled.group_id,
         message_id=message_id,
         title=scheduled.group_title or '',
         invite_link='',
+        poll_id='',
+    )
+
+    starts_text = get_text_sync('group_quiz_starts_in_10_sec')
+    send_text(chat_id=int(scheduled.group_id), text=starts_text)
+
+    launch_scheduled_group_quiz.apply_async(
+        kwargs={"group_quiz_id": group_quiz.pk},
+        countdown=10,
     )
 
     if not scheduled.is_periodic:
@@ -168,7 +164,46 @@ def start_scheduled_group_quiz(scheduled_quiz_id: int):
         scheduled.save(update_fields=['is_active', 'updated_at'])
         if scheduled.periodic_task_id:
             from django_celery_beat.models import PeriodicTask
-            PeriodicTask.objects.filter(pk=scheduled.periodic_task_id).update(enabled=False)
+            PeriodicTask.objects.filter(pk=scheduled.periodic_task_id).delete()
 
 
+@shared_task
+def launch_scheduled_group_quiz(group_quiz_id: int):
+    import asyncio
+    from aiogram import Bot
+    from aiogram.client.default import DefaultBotProperties
+    from aiogram.enums import ParseMode
+    from aiogram.client.session.aiohttp import AiohttpSession
+    from django.conf import settings
+    from quiz.models import GroupQuiz as GQ
+    from quiz.choices import QuizStatus
+
+    async def _run():
+        bot = Bot(
+            token=settings.API_TOKEN,
+            default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+        )
+        try:
+            group_quiz = await (
+                GQ.objects
+                .prefetch_related('part__questions', 'part__questions__options')
+                .select_related('part', 'part__quiz', 'user')
+                .filter(pk=group_quiz_id, status=QuizStatus.INIT)
+                .afirst()
+            )
+            if not group_quiz:
+                return
+
+            updated = await GQ.objects.filter(
+                pk=group_quiz_id, status=QuizStatus.INIT
+            ).aupdate(status=QuizStatus.STARTED)
+            if not updated:
+                return
+
+            from bot.handlers.groups.testing import start_group_testing
+            await start_group_testing(group_quiz=group_quiz, bot=bot)
+        finally:
+            await bot.session.close()
+
+    asyncio.run(_run())
 

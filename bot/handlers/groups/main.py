@@ -7,7 +7,6 @@ from quiz.choices import QuizStatus
 from quiz.models import GroupQuiz
 
 from bot import utils
-from bot.keyboards import inline_kb
 from bot.utils.functions import get_text
 
 from quiz.tasks import get_group_invite_link
@@ -31,14 +30,17 @@ async def send_quiz_ready_message(message, quiz_part):
             "title": str(quiz_part.title),
         },
     )
-
-    markup = await inline_kb.group_ready_markup(str(message.chat.id))
-
-    return await message.answer(text, reply_markup=markup)
+    return await message.answer(text)
 
 
-async def start_quiz_after_delay(group_quiz, bot):
+async def start_quiz_after_delay(group_id: str, bot):
     await asyncio.sleep(10)
+    group_quiz = await utils.get_group_quiz(group_id)
+    if not group_quiz or group_quiz.status != QuizStatus.INIT:
+        return
+    updated = await utils.update_group_quiz(group_quiz)
+    if not updated:
+        return
     await start_group_testing(group_quiz=group_quiz, bot=bot)
 
 
@@ -125,19 +127,12 @@ async def start_handler(message: types.Message):
             title=message.chat.title,
             invite_link=message.chat.invite_link,
         )
+        starts_text = await get_text("group_quiz_starts_in_10_sec")
+        await message.answer(starts_text)
+        asyncio.create_task(start_quiz_after_delay(group_id, message.bot))
         return
 
     if group_quiz.status == QuizStatus.INIT:
-
-        try:
-            await message.bot.edit_message_reply_markup(
-                chat_id=group_quiz.group_id,
-                message_id=group_quiz.message_id,
-                reply_markup=None,
-            )
-        except Exception:
-            pass
-
         if quiz_part.id != group_quiz.part_id:
             group_quiz.part_id = quiz_part.id
 
@@ -151,6 +146,9 @@ async def start_handler(message: types.Message):
             update_fields=["message_id", "part_id", "data", "user"]
         )
 
+        starts_text = await get_text("group_quiz_starts_in_10_sec")
+        await message.answer(starts_text)
+        asyncio.create_task(start_quiz_after_delay(group_id, message.bot))
         return
 
     # STARTED but not active in Redis → stale record (server restart or race condition).
@@ -170,6 +168,9 @@ async def start_handler(message: types.Message):
             title=message.chat.title,
             invite_link=message.chat.invite_link,
         )
+        starts_text = await get_text("group_quiz_starts_in_10_sec")
+        await message.answer(starts_text)
+        asyncio.create_task(start_quiz_after_delay(group_id, message.bot))
         return
 
     text = await get_text(
@@ -180,72 +181,3 @@ async def start_handler(message: types.Message):
     return await message.answer(text)
 
 
-async def get_ready_callback_handler(callback: types.CallbackQuery):
-    # Lightweight query — questions not needed for lobby
-    group_quiz = await utils.get_group_quiz_no_prefetch(group_id=str(callback.message.chat.id))
-
-    if not group_quiz:
-        return await callback.answer()
-
-    user = callback.from_user
-
-    username = (
-        f"@{user.username}"
-        if user.username
-        else f"{user.first_name} {user.last_name or ''}".strip()
-    )
-
-    await redis_group.add_player_to_group_quiz(
-        group_quiz_id=str(group_quiz.pk),
-        user_id=str(user.id),
-        username=username
-    )
-
-    players_count = await redis_group.get_players_count(str(group_quiz.pk))
-
-    text = await get_text(
-        "testing_group_quiz_part_ready_info_with_ready_counter",
-        {
-            "from_i": str(group_quiz.part.from_i),
-            "to_i": str(group_quiz.part.to_i),
-            "quantity": str(group_quiz.part.quantity),
-            "timer": str(group_quiz.part.quiz.timer),
-            "title": str(group_quiz.part.title),
-            "count": str(players_count),
-        },
-    )
-
-    callback_text = await get_text("group_test_starts_soon")
-
-    markup = await inline_kb.group_ready_markup(str(callback.message.chat.id))
-
-    try:
-        await callback.bot.edit_message_text(
-            chat_id=group_quiz.group_id,
-            message_id=group_quiz.message_id,
-            text=text,
-            reply_markup=markup,
-        )
-    except Exception:
-        pass
-
-    await callback.answer(callback_text)
-
-    if players_count >= 2:
-        updated = await utils.update_group_quiz(group_quiz)
-        if updated:
-            try:
-                starts_text = await get_text("group_quiz_starts_in_10_sec")
-                await callback.bot.send_message(
-                    chat_id=group_quiz.group_id,
-                    text=starts_text,
-                )
-            except Exception:
-                logger.exception("Failed to send 10s countdown message to group %s", group_quiz.group_id)
-
-            asyncio.create_task(
-                start_quiz_after_delay(group_quiz, callback.bot)
-            )
-
-    if not group_quiz.invite_link:
-        get_group_invite_link.delay(group_quiz.pk)
