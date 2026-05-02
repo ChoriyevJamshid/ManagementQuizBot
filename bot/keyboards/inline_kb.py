@@ -113,19 +113,22 @@ async def ss_quizzes_markup(
     selected_counts: dict,
     page: int,
     total_pages: int,
+    start_index: int = 0,
 ):
     builder = InlineKeyboardBuilder()
 
-    for quiz in page_quizzes:
+    for i, quiz in enumerate(page_quizzes):
         count = selected_counts.get(quiz['id'], 0)
-        icon = "📂" if count else "📁"
-        count_str = f" ({count} ta)" if count else ""
+        icon = "✅" if count else "📁"
         builder.add(InlineKeyboardButton(
-            text=f"{icon} {quiz['title']}{count_str}",
+            text=f"{icon} {start_index + i + 1}",
             callback_data=f"ss-quiz_{quiz['id']}",
         ))
 
-    row_widths = [1] * len(page_quizzes)
+    n = len(page_quizzes)
+    row_widths = [4] * (n // 4)
+    if n % 4:
+        row_widths.append(n % 4)
 
     if total_pages > 1:
         prev_cb = f"ss-quiz-page_{page - 1}" if page > 0 else "ss-quiz-noop"

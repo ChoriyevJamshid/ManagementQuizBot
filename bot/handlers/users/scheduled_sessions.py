@@ -54,13 +54,25 @@ def _compute_selected_counts(all_parts: list, selected_ids: list) -> dict:
     return counts
 
 
-def _build_quizzes_message(total_selected: int) -> str:
+def _build_quizzes_message(
+    page_quizzes: list,
+    selected_counts: dict,
+    page: int,
+    total_pages: int,
+) -> str:
+    lines = ["📂 <b>Quiz tanlang:</b>\n"]
+    for i, quiz in enumerate(page_quizzes):
+        global_num = page * _SS_QUIZ_PAGE_SIZE + i + 1
+        count = selected_counts.get(quiz['id'], 0)
+        mark = "✅" if count else "📁"
+        count_str = f" <i>({count} ta tanlangan)</i>" if count else ""
+        lines.append(f"{mark} <b>{global_num}.</b> {quiz['title']}{count_str}")
+    total_selected = sum(selected_counts.values())
     if total_selected:
-        return (
-            f"📂 <b>Quiz tanlang:</b>\n\n"
-            f"<i>Tanlangan: {total_selected} ta qism</i>"
-        )
-    return "📂 <b>Quiz tanlang:</b>"
+        lines.append(f"\n<i>Jami tanlangan: {total_selected} ta qism</i>")
+    if total_pages > 1:
+        lines.append(f"<i>Sahifa {page + 1} / {total_pages}</i>")
+    return "\n".join(lines)
 
 
 def _build_parts_message(quiz_title: str, quiz_parts: list, selected_ids: list) -> str:
@@ -275,8 +287,11 @@ async def _go_to_quizzes(callback, state: FSMContext, edit: bool = True, page: i
 
     await state.update_data(ss_all_parts=all_parts, ss_quiz_page=page)
 
-    text = _build_quizzes_message(sum(selected_counts.values()))
-    markup = await inline_kb.ss_quizzes_markup(page_quizzes, selected_counts, page, total_pages)
+    text = _build_quizzes_message(page_quizzes, selected_counts, page, total_pages)
+    markup = await inline_kb.ss_quizzes_markup(
+        page_quizzes, selected_counts, page, total_pages,
+        start_index=page * _SS_QUIZ_PAGE_SIZE,
+    )
 
     if edit:
         await callback.message.edit_text(text, reply_markup=markup)
@@ -334,8 +349,11 @@ async def ss_quiz_page_handler(callback: types.CallbackQuery, state: FSMContext)
 
     await state.update_data(ss_quiz_page=page)
 
-    text = _build_quizzes_message(sum(selected_counts.values()))
-    markup = await inline_kb.ss_quizzes_markup(page_quizzes, selected_counts, page, total_pages)
+    text = _build_quizzes_message(page_quizzes, selected_counts, page, total_pages)
+    markup = await inline_kb.ss_quizzes_markup(
+        page_quizzes, selected_counts, page, total_pages,
+        start_index=page * _SS_QUIZ_PAGE_SIZE,
+    )
     await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
 
