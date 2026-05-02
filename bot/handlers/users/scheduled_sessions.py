@@ -60,19 +60,27 @@ def _build_quizzes_message(
     page: int,
     total_pages: int,
 ) -> str:
-    lines = ["📂 <b>Quiz tanlang:</b>\n"]
+    quiz_lines = []
     for i, quiz in enumerate(page_quizzes):
         global_num = page * _SS_QUIZ_PAGE_SIZE + i + 1
         count = selected_counts.get(quiz['id'], 0)
         mark = "✅" if count else "📁"
         count_str = f" <i>({count} ta tanlangan)</i>" if count else ""
-        lines.append(f"{mark} <b>{global_num}.</b> {quiz['title']}{count_str}")
+        title = " ".join(quiz['title'].split())
+        quiz_lines.append(f"{mark} <b>{global_num}.</b> {title}{count_str}")
+
+    text = "📂 <b>Quiz tanlang:</b>\n\n" + "\n\n".join(quiz_lines)
+
+    footer = []
     total_selected = sum(selected_counts.values())
     if total_selected:
-        lines.append(f"\n<i>Jami tanlangan: {total_selected} ta qism</i>")
+        footer.append(f"<i>Jami tanlangan: {total_selected} ta qism</i>")
     if total_pages > 1:
-        lines.append(f"<i>Sahifa {page + 1} / {total_pages}</i>")
-    return "\n".join(lines)
+        footer.append(f"<i>Sahifa {page + 1} / {total_pages}</i>")
+    if footer:
+        text += "\n\n" + "\n".join(footer)
+
+    return text
 
 
 def _build_parts_message(quiz_title: str, quiz_parts: list, selected_ids: list) -> str:
