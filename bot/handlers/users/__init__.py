@@ -212,30 +212,36 @@ def prepare_router() -> Router:
         ss_group_id_entered_handler,
         ScheduledSessionState.enter_group_id,
     )
-    # step 2 — parts
+    # step 2a — quiz list
     router.callback_query.register(
-        ss_part_toggle_handler,
-        F.data.startswith('ss-part-toggle_'),
-        ScheduledSessionState.select_parts,
+        ss_quiz_selected_handler,
+        F.data.startswith('ss-quiz_'),
+        ScheduledSessionState.select_quiz,
     )
     router.callback_query.register(
-        ss_parts_page_handler,
-        F.data.startswith('ss-parts-page_'),
-        ScheduledSessionState.select_parts,
+        ss_quiz_page_handler,
+        F.data.startswith('ss-quiz-page_'),
+        ScheduledSessionState.select_quiz,
     )
     router.callback_query.register(
-        ss_parts_noop_handler,
-        F.data == 'ss-parts-noop',
-        ScheduledSessionState.select_parts,
+        ss_quiz_noop_handler,
+        F.data == 'ss-quiz-noop',
+        ScheduledSessionState.select_quiz,
     )
     router.callback_query.register(
         ss_parts_none_handler,
         F.data == 'ss-parts-none',
-        ScheduledSessionState.select_parts,
+        ScheduledSessionState.select_quiz,
     )
     router.callback_query.register(
         ss_parts_done_handler,
         F.data == 'ss-parts-done',
+        ScheduledSessionState.select_quiz,
+    )
+    # step 2b — parts within quiz
+    router.callback_query.register(
+        ss_part_toggle_handler,
+        F.data.startswith('ss-part-toggle_'),
         ScheduledSessionState.select_parts,
     )
     # step 3 — date
@@ -266,8 +272,9 @@ def prepare_router() -> Router:
         F.data == 'ss-back-to-groups',
     )
     router.callback_query.register(
-        ss_back_to_parts_handler,
-        F.data == 'ss-back-to-parts',
+        ss_back_to_quiz_list_handler,
+        F.data == 'ss-back-to-quizzes',
+        ScheduledSessionState.select_parts,
     )
     router.callback_query.register(
         ss_back_to_time_handler,

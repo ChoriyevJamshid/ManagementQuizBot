@@ -214,5 +214,6 @@
   "send_notify_to_quiz_owner": "⚠️ Foydalanuvchi sizning viktorinangizdan ruxsatsiz foydalanishga urindi.\n\r\nAgar uni bilsangiz, ushbu viktorina uchun ruxsat berilgan foydalanuvchilar ro’yxatiga qo’shishingiz mumkin. Aks holda, so’rovni rad etishingiz mumkin.\n \n<strong>Foydalanuvchi</strong>: <em>__username</em>\n<strong>Guruh</strong>: <em>__groupname</em>\n<strong>Viktorina</strong>: <em>__quizname</em>",
   "ss_cancelled_due_to_active_quiz": "❌ Rejalashtirilgan test boshlanmadi: guruhda allaqachon faol test mavjud.",
   "not_allowed_role_global": "🚫 Bu bot faqat Admin va Moderatorlar uchun mo'ljallangan.",
-  "ss_state_expired": "⚠️ Sessiya muddati tugadi. Iltimos, qaytadan boshlang."
+  "ss_state_expired": "⚠️ Sessiya muddati tugadi. Iltimos, qaytadan boshlang.",
+  "ss_btn_back_to_quizzes": "🔙 Quizlar ro'yxatiga"
 }

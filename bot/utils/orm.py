@@ -193,6 +193,7 @@ async def get_all_quiz_parts() -> list:
         return [
             {
                 'id': p.id,
+                'quiz_id': p.quiz.id,
                 'quiz_title': p.quiz.title,
                 'from_i': p.from_i,
                 'to_i': p.to_i,

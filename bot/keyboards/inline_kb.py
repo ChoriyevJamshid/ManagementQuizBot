@@ -108,42 +108,40 @@ async def ss_groups_markup(groups: list):
     return builder.adjust(1).as_markup()
 
 
-async def ss_parts_markup(
-    page_parts: list,
-    selected_ids: list,
+async def ss_quizzes_markup(
+    page_quizzes: list,
+    selected_counts: dict,
     page: int,
     total_pages: int,
-    start_index: int = 0,
 ):
     builder = InlineKeyboardBuilder()
 
-    for i, part in enumerate(page_parts):
-        global_num = start_index + i + 1
-        mark = "✅" if part['id'] in selected_ids else "☐"
+    for quiz in page_quizzes:
+        count = selected_counts.get(quiz['id'], 0)
+        icon = "📂" if count else "📁"
+        count_str = f" ({count} ta)" if count else ""
         builder.add(InlineKeyboardButton(
-            text=f"{mark} {global_num}",
-            callback_data=f"ss-part-toggle_{part['id']}",
+            text=f"{icon} {quiz['title']}{count_str}",
+            callback_data=f"ss-quiz_{quiz['id']}",
         ))
 
-    n = len(page_parts)
-    row_widths = [5] * (n // 5)
-    if n % 5:
-        row_widths.append(n % 5)
+    row_widths = [1] * len(page_quizzes)
 
     if total_pages > 1:
-        prev_cb = f"ss-parts-page_{page - 1}" if page > 0 else "ss-parts-noop"
-        next_cb = f"ss-parts-page_{page + 1}" if page < total_pages - 1 else "ss-parts-noop"
+        prev_cb = f"ss-quiz-page_{page - 1}" if page > 0 else "ss-quiz-noop"
+        next_cb = f"ss-quiz-page_{page + 1}" if page < total_pages - 1 else "ss-quiz-noop"
         builder.add(InlineKeyboardButton(text="◀", callback_data=prev_cb))
         builder.add(InlineKeyboardButton(
             text=f"{page + 1} / {total_pages}",
-            callback_data="ss-parts-noop",
+            callback_data="ss-quiz-noop",
         ))
         builder.add(InlineKeyboardButton(text="▶", callback_data=next_cb))
         row_widths.append(3)
 
     texts = await get_texts(('ss_btn_done_empty', 'ss_btn_back'))
-    if selected_ids:
-        done_text = f"✅ Tayyor ({len(selected_ids)} ta)"
+    total_selected = sum(selected_counts.values())
+    if total_selected:
+        done_text = f"✅ Tayyor ({total_selected} ta)"
         done_cb = "ss-parts-done"
     else:
         done_text = texts['ss_btn_done_empty']
@@ -152,6 +150,32 @@ async def ss_parts_markup(
     builder.add(InlineKeyboardButton(text=done_text, callback_data=done_cb))
     builder.add(InlineKeyboardButton(text=texts['ss_btn_back'], callback_data="ss-back-to-groups"))
     row_widths += [1, 1]
+
+    builder.adjust(*row_widths)
+    return builder.as_markup()
+
+
+async def ss_parts_markup(quiz_parts: list, selected_ids: list):
+    builder = InlineKeyboardBuilder()
+
+    for i, part in enumerate(quiz_parts):
+        mark = "✅" if part['id'] in selected_ids else "☐"
+        builder.add(InlineKeyboardButton(
+            text=f"{mark} {i + 1}",
+            callback_data=f"ss-part-toggle_{part['id']}",
+        ))
+
+    n = len(quiz_parts)
+    row_widths = [5] * (n // 5)
+    if n % 5:
+        row_widths.append(n % 5)
+
+    texts = await get_texts(('ss_btn_back_to_quizzes',))
+    builder.add(InlineKeyboardButton(
+        text=texts['ss_btn_back_to_quizzes'],
+        callback_data="ss-back-to-quizzes",
+    ))
+    row_widths.append(1)
 
     builder.adjust(*row_widths)
     return builder.as_markup()

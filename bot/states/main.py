@@ -31,6 +31,7 @@ class QuizState(StatesGroup):
 class ScheduledSessionState(StatesGroup):
     select_group = State()
     enter_group_id = State()
+    select_quiz = State()
     select_parts = State()
     select_date = State()
     select_time = State()

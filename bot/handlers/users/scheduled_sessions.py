@@ -14,27 +14,10 @@ from utils.choices import Role
 
 logger = logging.getLogger(__name__)
 _TZ = pytz.timezone('Asia/Tashkent')
-_SS_PAGE_SIZE = 10
+_SS_QUIZ_PAGE_SIZE = 8
 
 
-def _build_parts_message(
-    page_parts: list,
-    selected_ids: list,
-    page: int,
-    total_pages: int,
-) -> str:
-    lines = ["📚 <b>Quiz qismlarini tanlang:</b>\n"]
-    for i, part in enumerate(page_parts):
-        global_num = page * _SS_PAGE_SIZE + i + 1
-        mark = "✅" if part['id'] in selected_ids else "☐"
-        lines.append(
-            f"{mark} <b>{global_num}.</b> {part['quiz_title']} "
-            f"→ [{part['from_i']} - {part['to_i']}]"
-        )
-    if total_pages > 1:
-        lines.append(f"\n<i>Sahifa {page + 1} / {total_pages}</i>")
-    return "\n".join(lines)
-
+# ── Pure helpers ──────────────────────────────────────────────────────────────
 
 def _is_privileged(user) -> bool:
     return user.role in (Role.ADMIN, Role.MODERATOR)
@@ -46,6 +29,46 @@ async def _require_privileged(callback: types.CallbackQuery, user) -> bool:
         await callback.answer(text, show_alert=True)
         return False
     return True
+
+
+def _extract_quizzes(all_parts: list) -> list:
+    """Returns unique quizzes in order of first appearance."""
+    seen = {}
+    result = []
+    for part in all_parts:
+        qid = part['quiz_id']
+        if qid not in seen:
+            seen[qid] = True
+            result.append({'id': qid, 'title': part['quiz_title']})
+    return result
+
+
+def _compute_selected_counts(all_parts: list, selected_ids: list) -> dict:
+    """Returns {quiz_id: count_of_selected_parts}."""
+    selected_set = set(selected_ids)
+    counts = {}
+    for part in all_parts:
+        if part['id'] in selected_set:
+            qid = part['quiz_id']
+            counts[qid] = counts.get(qid, 0) + 1
+    return counts
+
+
+def _build_quizzes_message(total_selected: int) -> str:
+    if total_selected:
+        return (
+            f"📂 <b>Quiz tanlang:</b>\n\n"
+            f"<i>Tanlangan: {total_selected} ta qism</i>"
+        )
+    return "📂 <b>Quiz tanlang:</b>"
+
+
+def _build_parts_message(quiz_title: str, quiz_parts: list, selected_ids: list) -> str:
+    lines = [f"📚 <b>{quiz_title}:</b>\n"]
+    for i, part in enumerate(quiz_parts):
+        mark = "✅" if part['id'] in selected_ids else "☐"
+        lines.append(f"{mark} <b>{i + 1}.</b> [{part['from_i']} - {part['to_i']}]")
+    return "\n".join(lines)
 
 
 # ── Список расписаний ─────────────────────────────────────────────────────────
@@ -179,10 +202,11 @@ async def ss_group_selected_handler(callback: types.CallbackQuery, state: FSMCon
     )
 
     try:
-        await _go_to_parts(callback, state)
+        await _go_to_quizzes(callback, state)
     except Exception:
         logger.exception(
-            "ss_group_selected: user_id=%s exception in _go_to_parts", callback.from_user.id,
+            "ss_group_selected: user_id=%s exception in _go_to_quizzes",
+            callback.from_user.id,
         )
         await callback.answer("⚠️ Xatolik yuz berdi.", show_alert=True)
 
@@ -205,7 +229,10 @@ async def ss_group_id_entered_handler(message: types.Message, state: FSMContext)
         return await message.answer(text)
 
     await state.update_data(ss_group_id=group_id, ss_group_title=group_id)
-    logger.info("ss_group_id_entered: user_id=%s saved group_id=%s, proceeding to parts", message.from_user.id, group_id)
+    logger.info(
+        "ss_group_id_entered: user_id=%s saved group_id=%s, proceeding to quizzes",
+        message.from_user.id, group_id,
+    )
 
     class _FakeCallback:
         def __init__(self, msg):
@@ -213,41 +240,125 @@ async def ss_group_id_entered_handler(message: types.Message, state: FSMContext)
         async def answer(self, *args, **kwargs): pass
 
     try:
-        await _go_to_parts(_FakeCallback(message), state, edit=False)
+        await _go_to_quizzes(_FakeCallback(message), state, edit=False)
     except Exception:
-        logger.exception("ss_group_id_entered: user_id=%s exception in _go_to_parts", message.from_user.id)
+        logger.exception(
+            "ss_group_id_entered: user_id=%s exception in _go_to_quizzes",
+            message.from_user.id,
+        )
         await message.answer("⚠️ Xatolik yuz berdi.")
 
 
-# ── Создание: шаг 2 — части квиза ────────────────────────────────────────────
+# ── Создание: шаг 2а — список квизов ─────────────────────────────────────────
 
-async def _go_to_parts(callback, state: FSMContext, edit: bool = True, page: int = 0):
-    all_parts = await utils.get_all_quiz_parts()
+async def _go_to_quizzes(callback, state: FSMContext, edit: bool = True, page: int = 0):
     data = await state.get_data()
+    all_parts = data.get('ss_all_parts') or await utils.get_all_quiz_parts()
     selected = data.get('ss_selected_parts', [])
 
-    total_pages = max(1, (len(all_parts) + _SS_PAGE_SIZE - 1) // _SS_PAGE_SIZE)
+    quizzes = _extract_quizzes(all_parts)
+    total_pages = max(1, (len(quizzes) + _SS_QUIZ_PAGE_SIZE - 1) // _SS_QUIZ_PAGE_SIZE)
     page = max(0, min(page, total_pages - 1))
-    page_parts = all_parts[page * _SS_PAGE_SIZE: (page + 1) * _SS_PAGE_SIZE]
+    page_quizzes = quizzes[page * _SS_QUIZ_PAGE_SIZE: (page + 1) * _SS_QUIZ_PAGE_SIZE]
+    selected_counts = _compute_selected_counts(all_parts, selected)
 
     logger.info(
-        "_go_to_parts: all_parts_count=%d selected_count=%d page=%d total_pages=%d",
-        len(all_parts), len(selected), page, total_pages,
+        "_go_to_quizzes: quizzes=%d total_pages=%d page=%d selected=%d",
+        len(quizzes), total_pages, page, len(selected),
     )
 
-    await state.update_data(ss_all_parts=all_parts, ss_parts_page=page)
+    await state.update_data(ss_all_parts=all_parts, ss_quiz_page=page)
 
-    text = _build_parts_message(page_parts, selected, page, total_pages)
-    markup = await inline_kb.ss_parts_markup(
-        page_parts, selected, page, total_pages,
-        start_index=page * _SS_PAGE_SIZE,
-    )
+    text = _build_quizzes_message(sum(selected_counts.values()))
+    markup = await inline_kb.ss_quizzes_markup(page_quizzes, selected_counts, page, total_pages)
 
     if edit:
         await callback.message.edit_text(text, reply_markup=markup)
     else:
         await callback.message.answer(text, reply_markup=markup)
 
+    await state.set_state(ScheduledSessionState.select_quiz)
+    await callback.answer()
+
+
+async def ss_quiz_selected_handler(callback: types.CallbackQuery, state: FSMContext):
+    try:
+        quiz_id = int(callback.data.split('_')[-1])
+    except (ValueError, IndexError):
+        logger.warning(
+            "ss_quiz_selected: user_id=%s failed to parse quiz_id from callback_data=%r",
+            callback.from_user.id, callback.data,
+        )
+        await callback.answer("⚠️ Noto'g'ri ma'lumot.", show_alert=True)
+        return
+
+    logger.info("ss_quiz_selected: user_id=%s quiz_id=%d", callback.from_user.id, quiz_id)
+
+    try:
+        await _go_to_parts(callback, state, quiz_id=quiz_id)
+    except Exception:
+        logger.exception(
+            "ss_quiz_selected: user_id=%s exception in _go_to_parts", callback.from_user.id,
+        )
+        await callback.answer("⚠️ Xatolik yuz berdi.", show_alert=True)
+
+
+async def ss_quiz_page_handler(callback: types.CallbackQuery, state: FSMContext):
+    try:
+        page = int(callback.data.split('_')[-1])
+    except (ValueError, IndexError):
+        logger.warning(
+            "ss_quiz_page: user_id=%s failed to parse page from callback_data=%r",
+            callback.from_user.id, callback.data,
+        )
+        await callback.answer()
+        return
+
+    logger.info("ss_quiz_page: user_id=%s navigating to page=%d", callback.from_user.id, page)
+
+    data = await state.get_data()
+    all_parts = data.get('ss_all_parts', [])
+    selected = data.get('ss_selected_parts', [])
+
+    quizzes = _extract_quizzes(all_parts)
+    total_pages = max(1, (len(quizzes) + _SS_QUIZ_PAGE_SIZE - 1) // _SS_QUIZ_PAGE_SIZE)
+    page = max(0, min(page, total_pages - 1))
+    page_quizzes = quizzes[page * _SS_QUIZ_PAGE_SIZE: (page + 1) * _SS_QUIZ_PAGE_SIZE]
+    selected_counts = _compute_selected_counts(all_parts, selected)
+
+    await state.update_data(ss_quiz_page=page)
+
+    text = _build_quizzes_message(sum(selected_counts.values()))
+    markup = await inline_kb.ss_quizzes_markup(page_quizzes, selected_counts, page, total_pages)
+    await callback.message.edit_text(text, reply_markup=markup)
+    await callback.answer()
+
+
+async def ss_quiz_noop_handler(callback: types.CallbackQuery):
+    await callback.answer()
+
+
+# ── Создание: шаг 2б — части выбранного квиза ────────────────────────────────
+
+async def _go_to_parts(callback, state: FSMContext, quiz_id: int):
+    data = await state.get_data()
+    all_parts = data.get('ss_all_parts', [])
+    selected = data.get('ss_selected_parts', [])
+
+    quiz_parts = [p for p in all_parts if p['quiz_id'] == quiz_id]
+    quiz_title = quiz_parts[0]['quiz_title'] if quiz_parts else str(quiz_id)
+
+    logger.info(
+        "_go_to_parts: quiz_id=%d quiz_parts=%d selected_total=%d",
+        quiz_id, len(quiz_parts), len(selected),
+    )
+
+    await state.update_data(ss_current_quiz_id=quiz_id)
+
+    text = _build_parts_message(quiz_title, quiz_parts, selected)
+    markup = await inline_kb.ss_parts_markup(quiz_parts, selected)
+
+    await callback.message.edit_text(text, reply_markup=markup)
     await state.set_state(ScheduledSessionState.select_parts)
     await callback.answer()
 
@@ -265,7 +376,8 @@ async def ss_part_toggle_handler(callback: types.CallbackQuery, state: FSMContex
 
     data = await state.get_data()
     selected = list(data.get('ss_selected_parts', []))
-    page = data.get('ss_parts_page', 0)
+    quiz_id = data.get('ss_current_quiz_id')
+    all_parts = data.get('ss_all_parts', [])
 
     if part_id in selected:
         selected.remove(part_id)
@@ -273,58 +385,18 @@ async def ss_part_toggle_handler(callback: types.CallbackQuery, state: FSMContex
         selected.append(part_id)
 
     logger.info(
-        "ss_part_toggle: user_id=%s part_id=%d selected_count=%d selected=%s",
-        callback.from_user.id, part_id, len(selected), selected,
+        "ss_part_toggle: user_id=%s part_id=%d selected_count=%d",
+        callback.from_user.id, part_id, len(selected),
     )
 
     await state.update_data(ss_selected_parts=selected)
 
-    all_parts = data.get('ss_all_parts', [])
-    total_pages = max(1, (len(all_parts) + _SS_PAGE_SIZE - 1) // _SS_PAGE_SIZE)
-    page_parts = all_parts[page * _SS_PAGE_SIZE: (page + 1) * _SS_PAGE_SIZE]
+    quiz_parts = [p for p in all_parts if p['quiz_id'] == quiz_id]
+    quiz_title = quiz_parts[0]['quiz_title'] if quiz_parts else ''
 
-    text = _build_parts_message(page_parts, selected, page, total_pages)
-    markup = await inline_kb.ss_parts_markup(
-        page_parts, selected, page, total_pages,
-        start_index=page * _SS_PAGE_SIZE,
-    )
+    text = _build_parts_message(quiz_title, quiz_parts, selected)
+    markup = await inline_kb.ss_parts_markup(quiz_parts, selected)
     await callback.message.edit_text(text, reply_markup=markup)
-    await callback.answer()
-
-
-async def ss_parts_page_handler(callback: types.CallbackQuery, state: FSMContext):
-    try:
-        page = int(callback.data.split('_')[-1])
-    except (ValueError, IndexError):
-        logger.warning(
-            "ss_parts_page: user_id=%s failed to parse page from callback_data=%r",
-            callback.from_user.id, callback.data,
-        )
-        await callback.answer()
-        return
-
-    logger.info("ss_parts_page: user_id=%s navigating to page=%d", callback.from_user.id, page)
-
-    data = await state.get_data()
-    all_parts = data.get('ss_all_parts', [])
-    selected = data.get('ss_selected_parts', [])
-
-    total_pages = max(1, (len(all_parts) + _SS_PAGE_SIZE - 1) // _SS_PAGE_SIZE)
-    page = max(0, min(page, total_pages - 1))
-    page_parts = all_parts[page * _SS_PAGE_SIZE: (page + 1) * _SS_PAGE_SIZE]
-
-    await state.update_data(ss_parts_page=page)
-
-    text = _build_parts_message(page_parts, selected, page, total_pages)
-    markup = await inline_kb.ss_parts_markup(
-        page_parts, selected, page, total_pages,
-        start_index=page * _SS_PAGE_SIZE,
-    )
-    await callback.message.edit_text(text, reply_markup=markup)
-    await callback.answer()
-
-
-async def ss_parts_noop_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 
@@ -490,23 +562,21 @@ async def ss_back_to_groups_handler(callback: types.CallbackQuery, state: FSMCon
     await callback.answer()
 
 
-async def ss_back_to_parts_handler(callback: types.CallbackQuery, state: FSMContext):
+async def ss_back_to_quiz_list_handler(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
-    all_parts = data.get('ss_all_parts', [])
-    selected = data.get('ss_selected_parts', [])
-    page = data.get('ss_parts_page', 0)
-
-    total_pages = max(1, (len(all_parts) + _SS_PAGE_SIZE - 1) // _SS_PAGE_SIZE)
-    page_parts = all_parts[page * _SS_PAGE_SIZE: (page + 1) * _SS_PAGE_SIZE]
-
-    text = _build_parts_message(page_parts, selected, page, total_pages)
-    markup = await inline_kb.ss_parts_markup(
-        page_parts, selected, page, total_pages,
-        start_index=page * _SS_PAGE_SIZE,
+    page = data.get('ss_quiz_page', 0)
+    logger.info(
+        "ss_back_to_quiz_list: user_id=%s returning to quiz list page=%d",
+        callback.from_user.id, page,
     )
-    await callback.message.edit_text(text, reply_markup=markup)
-    await state.set_state(ScheduledSessionState.select_parts)
-    await callback.answer()
+    try:
+        await _go_to_quizzes(callback, state, page=page)
+    except Exception:
+        logger.exception(
+            "ss_back_to_quiz_list: user_id=%s exception in _go_to_quizzes",
+            callback.from_user.id,
+        )
+        await callback.answer("⚠️ Xatolik yuz berdi.", show_alert=True)
 
 
 async def ss_back_to_time_handler(callback: types.CallbackQuery, state: FSMContext):
