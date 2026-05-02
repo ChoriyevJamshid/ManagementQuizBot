@@ -1,11 +1,9 @@
 import logging
 
 from aiogram import types
-from asgiref.sync import sync_to_async
 
-from bot.utils import get_user
+from bot import utils
 from bot.utils.functions import get_text
-from utils.choices import Role
 
 logger = logging.getLogger(__name__)
 
@@ -16,42 +14,50 @@ async def add_group_handler(message: types.Message):
         await message.answer(text)
         return
 
-    user = await get_user(message.from_user)
-    if user.role not in (Role.ADMIN, Role.MODERATOR):
+    try:
+        admins = await message.bot.get_chat_administrators(message.chat.id)
+    except Exception:
+        logger.exception(
+            "add_group: failed to get administrators for group_id=%s", message.chat.id,
+        )
+        await message.answer("⚠️ Xatolik yuz berdi.")
+        return
+
+    admin_tg_ids = [a.user.id for a in admins if not a.user.is_bot]
+    logger.info(
+        "add_group: group_id=%s has %d human admins: %s",
+        message.chat.id, len(admin_tg_ids), admin_tg_ids,
+    )
+
+    privileged = await utils.get_privileged_profile_by_tg_ids(admin_tg_ids)
+    if not privileged:
         logger.info(
-            "add_group: user_id=%s role=%s tried /add in group_id=%s — not privileged",
-            message.from_user.id, user.role, message.chat.id,
+            "add_group: no ADMIN/MODERATOR found among admins of group_id=%s — ignoring",
+            message.chat.id,
         )
         return
 
-    chat = message.chat
-
-    def _upsert():
-        from common.models import TelegramGroup
-        obj, created = TelegramGroup.objects.update_or_create(
-            telegram_id=chat.id,
-            defaults={
-                'title': chat.title or str(chat.id),
-                'username': chat.username,
-                'added_by_id': user.pk,
-                'is_active': True,
-            },
-        )
-        return obj, created
+    logger.info(
+        "add_group: privileged user found chat_id=%s role=%s — adding group_id=%s",
+        privileged.chat_id, privileged.role, message.chat.id,
+    )
 
     try:
-        group, created = await sync_to_async(_upsert)()
+        group, created = await utils.add_or_update_telegram_group(
+            telegram_id=message.chat.id,
+            title=message.chat.title,
+            username=message.chat.username,
+            added_by_pk=privileged.pk,
+        )
         key = 'add_group_added' if created else 'add_group_updated'
         text = await get_text(key, {'title': group.title})
         await message.answer(text)
         logger.info(
-            "add_group: user_id=%s %s group telegram_id=%s title=%r",
-            message.from_user.id, 'added' if created else 'updated',
-            chat.id, chat.title,
+            "add_group: %s telegram_id=%s title=%r",
+            'added' if created else 'updated', message.chat.id, group.title,
         )
     except Exception:
         logger.exception(
-            "add_group: user_id=%s failed to add group telegram_id=%s",
-            message.from_user.id, chat.id,
+            "add_group: failed to upsert group telegram_id=%s", message.chat.id,
         )
         await message.answer("⚠️ Xatolik yuz berdi.")

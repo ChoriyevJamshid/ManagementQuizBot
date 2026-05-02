@@ -164,6 +164,44 @@ async def update_group_quiz(group_quiz):
 
 
 
+async def get_privileged_profile_by_tg_ids(tg_ids: list) -> 'com_models.TelegramProfile | None':
+    """Returns first TelegramProfile with ADMIN/MODERATOR role whose chat_id is in tg_ids."""
+    from asgiref.sync import sync_to_async
+    from utils.choices import Role as _Role
+
+    def _inner():
+        return com_models.TelegramProfile.objects.filter(
+            chat_id__in=[str(i) for i in tg_ids],
+            role__in=[_Role.ADMIN, _Role.MODERATOR],
+        ).first()
+
+    return await sync_to_async(_inner)()
+
+
+async def add_or_update_telegram_group(
+    telegram_id: int,
+    title: str,
+    username: str | None,
+    added_by_pk: int | None,
+) -> tuple:
+    """Upsert TelegramGroup by telegram_id. Returns (group, created)."""
+    from asgiref.sync import sync_to_async
+    from common.models import TelegramGroup
+
+    def _inner():
+        return TelegramGroup.objects.update_or_create(
+            telegram_id=telegram_id,
+            defaults={
+                'title': title or str(telegram_id),
+                'username': username,
+                'added_by_id': added_by_pk,
+                'is_active': True,
+            },
+        )
+
+    return await sync_to_async(_inner)()
+
+
 async def get_telegram_groups() -> list:
     from asgiref.sync import sync_to_async
     from common.models import TelegramGroup
