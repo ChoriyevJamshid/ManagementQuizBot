@@ -1,3 +1,4 @@
+import logging
 import re
 import pytz
 from datetime import datetime, timezone as dt_timezone
@@ -11,6 +12,7 @@ from bot.states import ScheduledSessionState, MainState
 from bot.utils.functions import get_text
 from utils.choices import Role
 
+logger = logging.getLogger(__name__)
 _TZ = pytz.timezone('Asia/Tashkent')
 
 
@@ -90,7 +92,11 @@ async def ss_create_handler(callback: types.CallbackQuery, state: FSMContext):
     if not await _require_privileged(callback, user):
         return
 
+    logger.info("ss_create: user_id=%s started schedule creation", callback.from_user.id)
+
     groups = await utils.get_distinct_groups()
+    logger.info("ss_create: user_id=%s fetched %d groups", callback.from_user.id, len(groups))
+
     await state.update_data(ss_groups=groups, ss_selected_parts=[])
 
     text = await get_text('ss_select_group')
@@ -101,22 +107,68 @@ async def ss_create_handler(callback: types.CallbackQuery, state: FSMContext):
 
 
 async def ss_group_selected_handler(callback: types.CallbackQuery, state: FSMContext):
-    idx = int(callback.data.split('_')[-1])
+    logger.info(
+        "ss_group_selected: user_id=%s callback_data=%r",
+        callback.from_user.id, callback.data,
+    )
+
+    try:
+        idx = int(callback.data.split('_')[-1])
+    except (ValueError, IndexError):
+        logger.warning(
+            "ss_group_selected: user_id=%s failed to parse idx from callback_data=%r",
+            callback.from_user.id, callback.data,
+        )
+        await callback.answer("⚠️ Noto'g'ri ma'lumot.", show_alert=True)
+        return
+
     data = await state.get_data()
     groups = data.get('ss_groups', [])
 
+    logger.info(
+        "ss_group_selected: user_id=%s idx=%d groups_count=%d state_keys=%s",
+        callback.from_user.id, idx, len(groups), list(data.keys()),
+    )
+
+    if not groups:
+        logger.warning(
+            "ss_group_selected: user_id=%s ss_groups is empty — FSM state likely lost",
+            callback.from_user.id,
+        )
+        text = await get_text('ss_state_expired')
+        await callback.answer(text, show_alert=True)
+        return
+
     if idx >= len(groups):
-        return await callback.answer()
+        logger.warning(
+            "ss_group_selected: user_id=%s idx=%d out of range (groups_count=%d)",
+            callback.from_user.id, idx, len(groups),
+        )
+        await callback.answer()
+        return
 
     group = groups[idx]
+    logger.info(
+        "ss_group_selected: user_id=%s selected group_id=%s title=%r",
+        callback.from_user.id, group['group_id'], group.get('title'),
+    )
+
     await state.update_data(
         ss_group_id=group['group_id'],
         ss_group_title=group.get('title') or group['group_id'],
     )
-    await _go_to_parts(callback, state)
+
+    try:
+        await _go_to_parts(callback, state)
+    except Exception:
+        logger.exception(
+            "ss_group_selected: user_id=%s exception in _go_to_parts", callback.from_user.id,
+        )
+        await callback.answer("⚠️ Xatolik yuz berdi.", show_alert=True)
 
 
 async def ss_group_manual_handler(callback: types.CallbackQuery, state: FSMContext):
+    logger.info("ss_group_manual: user_id=%s chose manual group_id entry", callback.from_user.id)
     text = await get_text('ss_enter_group_id')
     await callback.message.edit_text(text)
     await state.set_state(ScheduledSessionState.enter_group_id)
@@ -125,7 +177,10 @@ async def ss_group_manual_handler(callback: types.CallbackQuery, state: FSMConte
 
 async def ss_group_id_entered_handler(message: types.Message, state: FSMContext):
     group_id = message.text.strip()
+    logger.info("ss_group_id_entered: user_id=%s entered group_id=%r", message.from_user.id, group_id)
+
     if not re.match(r'^-?\d+$', group_id):
+        logger.warning("ss_group_id_entered: user_id=%s invalid group_id=%r", message.from_user.id, group_id)
         text = await get_text('ss_group_id_invalid')
         return await message.answer(text)
 
@@ -145,6 +200,11 @@ async def _go_to_parts(callback, state: FSMContext, edit: bool = True):
     data = await state.get_data()
     selected = data.get('ss_selected_parts', [])
 
+    logger.info(
+        "_go_to_parts: all_parts_count=%d selected_count=%d",
+        len(all_parts), len(selected),
+    )
+
     await state.update_data(ss_all_parts=all_parts)
 
     text = await get_text('ss_select_parts')
@@ -160,7 +220,16 @@ async def _go_to_parts(callback, state: FSMContext, edit: bool = True):
 
 
 async def ss_part_toggle_handler(callback: types.CallbackQuery, state: FSMContext):
-    part_id = int(callback.data.split('_')[-1])
+    try:
+        part_id = int(callback.data.split('_')[-1])
+    except (ValueError, IndexError):
+        logger.warning(
+            "ss_part_toggle: user_id=%s failed to parse part_id from callback_data=%r",
+            callback.from_user.id, callback.data,
+        )
+        await callback.answer()
+        return
+
     data = await state.get_data()
     selected = list(data.get('ss_selected_parts', []))
 
@@ -168,6 +237,11 @@ async def ss_part_toggle_handler(callback: types.CallbackQuery, state: FSMContex
         selected.remove(part_id)
     else:
         selected.append(part_id)
+
+    logger.info(
+        "ss_part_toggle: user_id=%s part_id=%d selected_count=%d selected=%s",
+        callback.from_user.id, part_id, len(selected), selected,
+    )
 
     await state.update_data(ss_selected_parts=selected)
 
@@ -183,6 +257,11 @@ async def ss_parts_none_handler(callback: types.CallbackQuery, state: FSMContext
 
 
 async def ss_parts_done_handler(callback: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    selected = data.get('ss_selected_parts', [])
+    logger.info(
+        "ss_parts_done: user_id=%s confirmed parts=%s", callback.from_user.id, selected,
+    )
     text = await get_text('ss_select_date')
     markup = await inline_kb.ss_date_markup()
     await callback.message.edit_text(text, reply_markup=markup)
@@ -194,6 +273,7 @@ async def ss_parts_done_handler(callback: types.CallbackQuery, state: FSMContext
 
 async def ss_date_selected_handler(callback: types.CallbackQuery, state: FSMContext):
     date_str = callback.data.split('_')[-1]
+    logger.info("ss_date_selected: user_id=%s date=%s", callback.from_user.id, date_str)
     await state.update_data(ss_date=date_str)
 
     text = await get_text('ss_select_time')
@@ -206,8 +286,10 @@ async def ss_date_selected_handler(callback: types.CallbackQuery, state: FSMCont
 
 async def ss_time_entered_handler(message: types.Message, state: FSMContext):
     time_str = message.text.strip()
+    logger.info("ss_time_entered: user_id=%s time=%r", message.from_user.id, time_str)
 
     if not re.match(r'^([01]?\d|2[0-3]):[0-5]\d$', time_str):
+        logger.warning("ss_time_entered: user_id=%s invalid time format=%r", message.from_user.id, time_str)
         text = await get_text('ss_time_invalid')
         return await message.answer(text)
 
@@ -220,12 +302,24 @@ async def ss_time_entered_handler(message: types.Message, state: FSMContext):
         local_dt = _TZ.localize(datetime(year, month, day, hour, minute))
         now_utc = datetime.now(dt_timezone.utc)
         if local_dt.astimezone(dt_timezone.utc) <= now_utc:
+            logger.warning(
+                "ss_time_entered: user_id=%s time is in the past date=%s time=%s",
+                message.from_user.id, date_str, time_str,
+            )
             text = await get_text('ss_time_in_past')
             return await message.answer(text)
     except Exception:
+        logger.exception(
+            "ss_time_entered: user_id=%s failed to parse date=%r time=%r",
+            message.from_user.id, date_str, time_str,
+        )
         text = await get_text('ss_time_invalid')
         return await message.answer(text)
 
+    logger.info(
+        "ss_time_entered: user_id=%s date=%s time=%s scheduled_at_local=%s",
+        message.from_user.id, date_str, time_str, local_dt.isoformat(),
+    )
     await state.update_data(ss_time=time_str)
     await _show_confirmation(message, data, date_str, time_str)
     await state.set_state(ScheduledSessionState.confirm)
@@ -258,21 +352,41 @@ async def ss_confirm_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
     data = await state.get_data()
 
-    date_str = data['ss_date']
-    time_str = data['ss_time']
-    day, month, year = map(int, date_str.split('.'))
-    hour, minute = map(int, time_str.split(':'))
-
-    local_dt = _TZ.localize(datetime(year, month, day, hour, minute))
-    scheduled_at_utc = local_dt.astimezone(dt_timezone.utc)
-
-    await utils.create_scheduled_session(
-        created_by_id=user.id,
-        group_id=data['ss_group_id'],
-        group_title=data.get('ss_group_title', ''),
-        part_ids=data.get('ss_selected_parts', []),
-        scheduled_at=scheduled_at_utc,
+    logger.info(
+        "ss_confirm: user_id=%s group_id=%s group_title=%r parts=%s date=%s time=%s",
+        callback.from_user.id,
+        data.get('ss_group_id'),
+        data.get('ss_group_title'),
+        data.get('ss_selected_parts'),
+        data.get('ss_date'),
+        data.get('ss_time'),
     )
+
+    try:
+        date_str = data['ss_date']
+        time_str = data['ss_time']
+        day, month, year = map(int, date_str.split('.'))
+        hour, minute = map(int, time_str.split(':'))
+
+        local_dt = _TZ.localize(datetime(year, month, day, hour, minute))
+        scheduled_at_utc = local_dt.astimezone(dt_timezone.utc)
+
+        session = await utils.create_scheduled_session(
+            created_by_id=user.id,
+            group_id=data['ss_group_id'],
+            group_title=data.get('ss_group_title', ''),
+            part_ids=data.get('ss_selected_parts', []),
+            scheduled_at=scheduled_at_utc,
+        )
+
+        logger.info(
+            "ss_confirm: user_id=%s session created pk=%s scheduled_at_utc=%s task_ids=%s",
+            callback.from_user.id, session.pk, scheduled_at_utc.isoformat(), session.celery_task_ids,
+        )
+    except Exception:
+        logger.exception("ss_confirm: user_id=%s failed to create session", callback.from_user.id)
+        await callback.answer("⚠️ Jadval yaratishda xatolik yuz berdi.", show_alert=True)
+        return
 
     text = await get_text('ss_created')
     await callback.message.edit_text(text)
