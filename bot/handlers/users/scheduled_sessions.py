@@ -14,6 +14,26 @@ from utils.choices import Role
 
 logger = logging.getLogger(__name__)
 _TZ = pytz.timezone('Asia/Tashkent')
+_SS_PAGE_SIZE = 10
+
+
+def _build_parts_message(
+    page_parts: list,
+    selected_ids: list,
+    page: int,
+    total_pages: int,
+) -> str:
+    lines = ["📚 <b>Quiz qismlarini tanlang:</b>\n"]
+    for i, part in enumerate(page_parts):
+        global_num = page * _SS_PAGE_SIZE + i + 1
+        mark = "✅" if part['id'] in selected_ids else "☐"
+        lines.append(
+            f"{mark} <b>{global_num}.</b> {part['quiz_title']} "
+            f"→ [{part['from_i']} - {part['to_i']}]"
+        )
+    if total_pages > 1:
+        lines.append(f"\n<i>Sahifa {page + 1} / {total_pages}</i>")
+    return "\n".join(lines)
 
 
 def _is_privileged(user) -> bool:
@@ -206,15 +226,22 @@ async def _go_to_parts(callback, state: FSMContext, edit: bool = True, page: int
     data = await state.get_data()
     selected = data.get('ss_selected_parts', [])
 
+    total_pages = max(1, (len(all_parts) + _SS_PAGE_SIZE - 1) // _SS_PAGE_SIZE)
+    page = max(0, min(page, total_pages - 1))
+    page_parts = all_parts[page * _SS_PAGE_SIZE: (page + 1) * _SS_PAGE_SIZE]
+
     logger.info(
-        "_go_to_parts: all_parts_count=%d selected_count=%d page=%d",
-        len(all_parts), len(selected), page,
+        "_go_to_parts: all_parts_count=%d selected_count=%d page=%d total_pages=%d",
+        len(all_parts), len(selected), page, total_pages,
     )
 
     await state.update_data(ss_all_parts=all_parts, ss_parts_page=page)
 
-    text = await get_text('ss_select_parts')
-    markup = await inline_kb.ss_parts_markup(all_parts, selected, page=page)
+    text = _build_parts_message(page_parts, selected, page, total_pages)
+    markup = await inline_kb.ss_parts_markup(
+        page_parts, selected, page, total_pages,
+        start_index=page * _SS_PAGE_SIZE,
+    )
 
     if edit:
         await callback.message.edit_text(text, reply_markup=markup)
@@ -253,8 +280,15 @@ async def ss_part_toggle_handler(callback: types.CallbackQuery, state: FSMContex
     await state.update_data(ss_selected_parts=selected)
 
     all_parts = data.get('ss_all_parts', [])
-    markup = await inline_kb.ss_parts_markup(all_parts, selected, page=page)
-    await callback.message.edit_reply_markup(reply_markup=markup)
+    total_pages = max(1, (len(all_parts) + _SS_PAGE_SIZE - 1) // _SS_PAGE_SIZE)
+    page_parts = all_parts[page * _SS_PAGE_SIZE: (page + 1) * _SS_PAGE_SIZE]
+
+    text = _build_parts_message(page_parts, selected, page, total_pages)
+    markup = await inline_kb.ss_parts_markup(
+        page_parts, selected, page, total_pages,
+        start_index=page * _SS_PAGE_SIZE,
+    )
+    await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
 
 
@@ -275,10 +309,18 @@ async def ss_parts_page_handler(callback: types.CallbackQuery, state: FSMContext
     all_parts = data.get('ss_all_parts', [])
     selected = data.get('ss_selected_parts', [])
 
+    total_pages = max(1, (len(all_parts) + _SS_PAGE_SIZE - 1) // _SS_PAGE_SIZE)
+    page = max(0, min(page, total_pages - 1))
+    page_parts = all_parts[page * _SS_PAGE_SIZE: (page + 1) * _SS_PAGE_SIZE]
+
     await state.update_data(ss_parts_page=page)
 
-    markup = await inline_kb.ss_parts_markup(all_parts, selected, page=page)
-    await callback.message.edit_reply_markup(reply_markup=markup)
+    text = _build_parts_message(page_parts, selected, page, total_pages)
+    markup = await inline_kb.ss_parts_markup(
+        page_parts, selected, page, total_pages,
+        start_index=page * _SS_PAGE_SIZE,
+    )
+    await callback.message.edit_text(text, reply_markup=markup)
     await callback.answer()
 
 
@@ -453,8 +495,15 @@ async def ss_back_to_parts_handler(callback: types.CallbackQuery, state: FSMCont
     all_parts = data.get('ss_all_parts', [])
     selected = data.get('ss_selected_parts', [])
     page = data.get('ss_parts_page', 0)
-    text = await get_text('ss_select_parts')
-    markup = await inline_kb.ss_parts_markup(all_parts, selected, page=page)
+
+    total_pages = max(1, (len(all_parts) + _SS_PAGE_SIZE - 1) // _SS_PAGE_SIZE)
+    page_parts = all_parts[page * _SS_PAGE_SIZE: (page + 1) * _SS_PAGE_SIZE]
+
+    text = _build_parts_message(page_parts, selected, page, total_pages)
+    markup = await inline_kb.ss_parts_markup(
+        page_parts, selected, page, total_pages,
+        start_index=page * _SS_PAGE_SIZE,
+    )
     await callback.message.edit_text(text, reply_markup=markup)
     await state.set_state(ScheduledSessionState.select_parts)
     await callback.answer()

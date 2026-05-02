@@ -108,24 +108,27 @@ async def ss_groups_markup(groups: list):
     return builder.adjust(1).as_markup()
 
 
-async def ss_parts_markup(all_parts: list, selected_ids: list, page: int = 0, page_size: int = 10):
-    total = len(all_parts)
-    total_pages = max(1, (total + page_size - 1) // page_size)
-    page = max(0, min(page, total_pages - 1))
-
-    page_parts = all_parts[page * page_size: (page + 1) * page_size]
-
+async def ss_parts_markup(
+    page_parts: list,
+    selected_ids: list,
+    page: int,
+    total_pages: int,
+    start_index: int = 0,
+):
     builder = InlineKeyboardBuilder()
-    for part in page_parts:
+
+    for i, part in enumerate(page_parts):
+        global_num = start_index + i + 1
         mark = "✅" if part['id'] in selected_ids else "☐"
-        raw = f"{mark} {part['quiz_title']} → [{part['from_i']} - {part['to_i']}]"
-        label = raw if len(raw) <= 38 else raw[:37] + '…'
         builder.add(InlineKeyboardButton(
-            text=label,
-            callback_data=f"ss-part-toggle_{part['id']}"
+            text=f"{mark} {global_num}",
+            callback_data=f"ss-part-toggle_{part['id']}",
         ))
 
-    row_widths = [1] * len(page_parts)
+    n = len(page_parts)
+    row_widths = [5] * (n // 5)
+    if n % 5:
+        row_widths.append(n % 5)
 
     if total_pages > 1:
         prev_cb = f"ss-parts-page_{page - 1}" if page > 0 else "ss-parts-noop"
