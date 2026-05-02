@@ -4,8 +4,9 @@ from aiogram.fsm.context import FSMContext
 
 from bot.utils import get_user
 from bot.keyboards import reply_kb
-from bot.utils.functions import get_texts
+from bot.utils.functions import get_texts, get_text
 from bot.states import MainState
+from utils.choices import Role
 
 
 class RegisteredFilter(Filter):
@@ -20,9 +21,14 @@ class RegisteredFilter(Filter):
 
         user = await get_user(event.from_user)
 
-        # Зарегистрированный пользователь — пропускаем
         if user.is_registered:
-            return True
+            if user.role in (Role.ADMIN, Role.MODERATOR):
+                return True
+            text = await get_text('not_allowed_role_global')
+            await message.answer(text=text)
+            if isinstance(event, CallbackQuery):
+                await event.answer()
+            return False
 
         # Пользователь отправляет контакт — пропускаем (обработчик сам сохранит)
         if isinstance(event, Message) and event.content_type == ContentType.CONTACT:

@@ -9,8 +9,8 @@ from bot.handlers.users.instruction import *
 from bot.handlers.users.quizzes import *
 from bot.handlers.users.testing import *
 from bot.handlers.users.inline_mode import *
-from bot.handlers.users.schedule_quiz import *
-from bot.states import ScheduleQuizState
+from bot.handlers.users.scheduled_sessions import *
+from bot.states import ScheduledSessionState
 
 
 def prepare_router() -> Router:
@@ -180,79 +180,88 @@ def prepare_router() -> Router:
         MainState.instruction,
     )
 
-    # schedule_quiz.py
+    # scheduled_sessions.py
     router.callback_query.register(
-        schedule_quiz_start_handler,
-        F.data.startswith('quiz-schedule_'),
+        ss_list_handler,
+        F.data == 'menu-scheduled-sessions',
     )
     router.callback_query.register(
-        schedule_part_selected_handler,
-        F.data.startswith('schedule-part_'),
-        ScheduleQuizState.select_part,
+        ss_detail_handler,
+        F.data.startswith('ss-detail_'),
     )
     router.callback_query.register(
-        schedule_group_selected_handler,
-        F.data.startswith('schedule-group-idx_'),
-        ScheduleQuizState.select_group,
+        ss_cancel_session_handler,
+        F.data.startswith('ss-cancel-session_'),
     )
     router.callback_query.register(
-        schedule_group_manual_handler,
-        F.data == 'schedule-group-manual',
-        ScheduleQuizState.select_group,
+        ss_create_handler,
+        F.data == 'ss-create',
+    )
+    # step 1 — group
+    router.callback_query.register(
+        ss_group_selected_handler,
+        F.data.startswith('ss-group-idx_'),
+        ScheduledSessionState.select_group,
+    )
+    router.callback_query.register(
+        ss_group_manual_handler,
+        F.data == 'ss-group-manual',
+        ScheduledSessionState.select_group,
     )
     router.message.register(
-        schedule_group_id_entered_handler,
-        ScheduleQuizState.enter_group_id,
+        ss_group_id_entered_handler,
+        ScheduledSessionState.enter_group_id,
+    )
+    # step 2 — parts
+    router.callback_query.register(
+        ss_part_toggle_handler,
+        F.data.startswith('ss-part-toggle_'),
+        ScheduledSessionState.select_parts,
     )
     router.callback_query.register(
-        schedule_type_onetime_handler,
-        F.data == 'schedule-type-onetime',
-        ScheduleQuizState.select_type,
+        ss_parts_none_handler,
+        F.data == 'ss-parts-none',
+        ScheduledSessionState.select_parts,
     )
     router.callback_query.register(
-        schedule_type_periodic_handler,
-        F.data == 'schedule-type-periodic',
-        ScheduleQuizState.select_type,
+        ss_parts_done_handler,
+        F.data == 'ss-parts-done',
+        ScheduledSessionState.select_parts,
     )
+    # step 3 — date
     router.callback_query.register(
-        schedule_days_selected_handler,
-        F.data.startswith('schedule-days_'),
-        ScheduleQuizState.select_days,
+        ss_date_selected_handler,
+        F.data.startswith('ss-date_'),
+        ScheduledSessionState.select_date,
     )
+    # step 4 — time
     router.message.register(
-        schedule_date_entered_handler,
-        ScheduleQuizState.select_date,
+        ss_time_entered_handler,
+        ScheduledSessionState.select_time,
     )
-    router.message.register(
-        schedule_time_entered_handler,
-        ScheduleQuizState.select_time,
+    # step 5 — confirm
+    router.callback_query.register(
+        ss_confirm_handler,
+        F.data == 'ss-confirm',
+        ScheduledSessionState.confirm,
     )
     router.callback_query.register(
-        schedule_confirm_handler,
-        F.data == 'schedule-confirm',
-        ScheduleQuizState.confirm,
-    )
-    router.callback_query.register(
-        schedule_cancel_handler,
-        F.data == 'schedule-cancel',
-        ScheduleQuizState.confirm,
+        ss_cancel_handler,
+        F.data == 'ss-cancel',
+        ScheduledSessionState.confirm,
     )
     # back navigation
     router.callback_query.register(
-        schedule_back_to_quiz_detail_handler,
-        F.data == 'schedule-back-to-quiz-detail',
+        ss_back_to_groups_handler,
+        F.data == 'ss-back-to-groups',
     )
     router.callback_query.register(
-        schedule_back_to_parts_handler,
-        F.data == 'schedule-back-to-parts',
+        ss_back_to_parts_handler,
+        F.data == 'ss-back-to-parts',
     )
     router.callback_query.register(
-        schedule_back_to_groups_handler,
-        F.data == 'schedule-back-to-groups',
-    )
-    router.callback_query.register(
-        schedule_back_to_type_handler,
-        F.data == 'schedule-back-to-type',
+        ss_back_to_time_handler,
+        F.data == 'ss-back-to-time',
     )
 
     # inline_mode.py

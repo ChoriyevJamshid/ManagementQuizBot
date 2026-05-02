@@ -8,6 +8,11 @@ from bot.utils.functions import get_text, get_texts
 from bot.handlers.users.quizzes import quiz_list_handler
 from bot.handlers.users.create_quizzes import create_quiz_handler
 from bot.handlers.users.instruction import instruction_handler
+from utils.choices import Role
+
+
+def _is_privileged(user) -> bool:
+    return user.role in (Role.ADMIN, Role.MODERATOR)
 
 
 async def start_handler(message: types.Message, state: FSMContext):
@@ -24,7 +29,7 @@ async def start_handler(message: types.Message, state: FSMContext):
         await state.set_state(states.MainState.share_contact)
         return
 
-    markup = await inline_kb.main_menu_markup()
+    markup = await inline_kb.main_menu_markup(show_schedule=_is_privileged(user))
     text = await get_text('main_menu')
 
     await state.update_data(markup_message_id=message.message_id + 1)
@@ -43,7 +48,7 @@ async def cancel_handler(message: types.Message, state: FSMContext):
 
     current_state = await state.get_state()
     if current_state and current_state.startswith("CreateQuizState"):
-        markup = await inline_kb.main_menu_markup()
+        markup = await inline_kb.main_menu_markup(show_schedule=_is_privileged(user))
         text = await get_texts(('main_menu', 'cancel_text'))
         await message.answer(text['cancel_text'], reply_markup=await reply_kb.remove_kb())
         await message.answer(text['main_menu'], reply_markup=markup)
@@ -59,6 +64,9 @@ async def main_menu_handler(callback: types.CallbackQuery, state: FSMContext):
         await create_quiz_handler(callback, state)
     elif callback.data == "menu-instruction":
         await instruction_handler(callback, state)
+    elif callback.data == "menu-scheduled-sessions":
+        from bot.handlers.users.scheduled_sessions import ss_list_handler
+        await ss_list_handler(callback, state)
     else:
         await callback.answer()
 
@@ -73,7 +81,7 @@ async def get_user_contact_handler(message: types.Message, state: FSMContext):
 
     user.phone_number = str(message.contact.phone_number)
     user.is_registered = True
-    markup = await inline_kb.main_menu_markup()
+    markup = await inline_kb.main_menu_markup(show_schedule=_is_privileged(user))
     texts = await get_texts(('main_menu', 'registered_success_text'))
 
     await message.answer(texts['registered_success_text'], reply_markup=await reply_kb.remove_kb())

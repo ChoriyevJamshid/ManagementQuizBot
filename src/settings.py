@@ -321,9 +321,9 @@ UNFOLD = {
                         "link": reverse_lazy("admin:quiz_groupquiz_changelist"),
                     },
                     {
-                        "title": _("Scheduled Quizzes"),
+                        "title": _("Scheduled Sessions"),
                         "icon": "schedule",
-                        "link": reverse_lazy("admin:quiz_scheduledquiz_changelist"),
+                        "link": reverse_lazy("admin:quiz_scheduledsession_changelist"),
                     },
                 ],
             },

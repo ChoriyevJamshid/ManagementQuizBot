@@ -20,11 +20,6 @@ def prepare_router() -> Router:
         F.data.startswith("testing-group-get-excel")
     )
 
-    router.callback_query.register(
-        group_quiz_continue_callback,
-        F.data.startswith("testing-group-continue-quiz")
-    )
-
     router.poll_answer.register(testing_group_poll_answer_handler)
 
     return router

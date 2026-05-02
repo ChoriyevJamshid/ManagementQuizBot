@@ -100,12 +100,14 @@ services:
       dockerfile: Dockerfile
     container_name: manager_bot_celery
     restart: always
-    command: celery -A src worker --concurrency=2 --loglevel=INFO
+    command: celery -A src worker --concurrency=20 --pool=threads --loglevel=INFO
     entrypoint: [ ]
     volumes:
       - .:/app
     env_file:
       - ./.env
+    environment:
+      - TZ=Asia/Tashkent
     depends_on:
       - redis
       - postgres
@@ -122,9 +124,12 @@ services:
       - ./:/app
     env_file:
       - ./.env
+    environment:
+      - TZ=Asia/Tashkent
     depends_on:
       - redis
       - postgres
+      - celery
 
 volumes:
   postgres_data:

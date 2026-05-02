@@ -14,3 +14,10 @@ class QuizPrivacy(models.TextChoices):
     PRIVATE = 'PRIVATE', 'PRIVATE'
 
 
+class SessionStatus(models.TextChoices):
+    PENDING = 'pending', 'Pending'
+    RUNNING = 'running', 'Running'
+    COMPLETED = 'completed', 'Completed'
+    CANCELLED = 'cancelled', 'Cancelled'
+
+

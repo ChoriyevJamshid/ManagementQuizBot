@@ -28,12 +28,10 @@ class QuizState(StatesGroup):
     update_privacy = State()
 
 
-class ScheduleQuizState(StatesGroup):
-    select_part = State()
+class ScheduledSessionState(StatesGroup):
     select_group = State()
     enter_group_id = State()
-    select_type = State()
-    select_days = State()
+    select_parts = State()
     select_date = State()
     select_time = State()
     confirm = State()

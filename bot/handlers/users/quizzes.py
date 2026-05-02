@@ -237,8 +237,10 @@ async def quiz_list_change_privacy_handler(callback: types.CallbackQuery, state:
 
 async def quiz_list_back_to_main_menu_handler(callback: types.CallbackQuery, state: FSMContext):
     user = await utils.get_user(callback.from_user)
+    from utils.choices import Role
+    show_schedule = user.role in (Role.ADMIN, Role.MODERATOR)
 
-    markup = await inline_kb.main_menu_markup()
+    markup = await inline_kb.main_menu_markup(show_schedule=show_schedule)
     text = await get_text('main_menu')
     await callback.message.edit_text(text, reply_markup=markup)
     await state.clear()

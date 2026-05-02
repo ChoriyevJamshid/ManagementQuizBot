@@ -16,7 +16,7 @@ async def get_languages_markup():
     return builder.adjust(*(1,)).as_markup()
 
 
-async def main_menu_markup():
+async def main_menu_markup(show_schedule: bool = False):
     builder = InlineKeyboardBuilder()
     texts = await get_texts((
         'my_quizzes_button',
@@ -33,6 +33,12 @@ async def main_menu_markup():
     builder.add(InlineKeyboardButton(
         text=texts['instruction_button'], callback_data=f"menu-instruction"
     ))
+    if show_schedule:
+        ss_btn = await get_text('ss_main_menu_button')
+        builder.add(InlineKeyboardButton(
+            text=ss_btn, callback_data="menu-scheduled-sessions"
+        ))
+        return builder.adjust(2, 1, 1).as_markup()
 
     return builder.adjust(*(2, 1,)).as_markup()
 
@@ -71,7 +77,7 @@ async def get_quizzes_markup(quiz_data: dict, state: FSMContext):
 async def quiz_detail_markup(quiz):
     builder = InlineKeyboardBuilder()
 
-    texts = await get_texts(('edit_timer_button', 'edit_privacy_button', 'turn_on', 'turn_off', 'schedule_button'))
+    texts = await get_texts(('edit_timer_button', 'edit_privacy_button', 'turn_on', 'turn_off'))
 
     builder.add(InlineKeyboardButton(
         text=f'{texts["edit_timer_button"]}', callback_data=f"quiz-list-edit-timer_{quiz.id}"
@@ -84,84 +90,99 @@ async def quiz_detail_markup(quiz):
     ))
 
     builder.add(InlineKeyboardButton(
-        text=texts['schedule_button'], callback_data=f"quiz-schedule_{quiz.id}"
-    ))
-
-    builder.add(InlineKeyboardButton(
         text='🔙', callback_data=f"quiz-list-back-user-quizzes"
     ))
     return builder.adjust(*(1,)).as_markup()
 
 
-async def schedule_parts_markup(quiz_parts: list):
-    builder = InlineKeyboardBuilder()
-    for part in quiz_parts:
-        builder.add(InlineKeyboardButton(
-            text=f"[{part.from_i} - {part.to_i}]",
-            callback_data=f"schedule-part_{part.id}"
-        ))
-    back_text = await get_text('back_text')
-    builder.add(InlineKeyboardButton(text=back_text, callback_data="schedule-back-to-quiz-detail"))
-    return builder.adjust(2, 1).as_markup()
-
-
-async def schedule_groups_markup(groups: list):
+async def ss_groups_markup(groups: list):
     builder = InlineKeyboardBuilder()
     for i, g in enumerate(groups):
         title = g.get('title') or g.get('group_id', '')
         builder.add(InlineKeyboardButton(
             text=f"📌 {title}",
-            callback_data=f"schedule-group-idx_{i}"
+            callback_data=f"ss-group-idx_{i}"
         ))
-    texts = await get_texts(('schedule_other_group', 'back_text'))
-    builder.add(InlineKeyboardButton(text=texts['schedule_other_group'], callback_data="schedule-group-manual"))
-    builder.add(InlineKeyboardButton(text=texts['back_text'], callback_data="schedule-back-to-parts"))
+    texts = await get_texts(('ss_btn_enter_manual', 'ss_btn_back'))
+    builder.add(InlineKeyboardButton(text=texts['ss_btn_enter_manual'], callback_data="ss-group-manual"))
     return builder.adjust(1).as_markup()
 
 
-async def schedule_type_markup():
-    texts = await get_texts(('schedule_one_time', 'schedule_periodic', 'back_text'))
+async def ss_parts_markup(all_parts: list, selected_ids: list):
     builder = InlineKeyboardBuilder()
-    builder.add(InlineKeyboardButton(text=texts['schedule_one_time'], callback_data="schedule-type-onetime"))
-    builder.add(InlineKeyboardButton(text=texts['schedule_periodic'], callback_data="schedule-type-periodic"))
-    builder.add(InlineKeyboardButton(text=texts['back_text'], callback_data="schedule-back-to-groups"))
-    return builder.adjust(1).as_markup()
-
-
-async def schedule_days_markup():
-    texts = await get_texts((
-        'schedule_days_every', 'schedule_days_weekdays',
-        'schedule_day_mon', 'schedule_day_tue', 'schedule_day_wed',
-        'schedule_day_thu', 'schedule_day_fri', 'schedule_day_sat',
-        'schedule_day_sun', 'back_text',
-    ))
-    days = [
-        ('*', texts['schedule_days_every']),
-        ('1,2,3,4,5', texts['schedule_days_weekdays']),
-        ('1', texts['schedule_day_mon']),
-        ('2', texts['schedule_day_tue']),
-        ('3', texts['schedule_day_wed']),
-        ('4', texts['schedule_day_thu']),
-        ('5', texts['schedule_day_fri']),
-        ('6', texts['schedule_day_sat']),
-        ('0', texts['schedule_day_sun']),
-    ]
-    builder = InlineKeyboardBuilder()
-    for value, label in days:
+    for part in all_parts:
+        mark = "✅" if part['id'] in selected_ids else "☐"
+        label = f"{mark} {part['quiz_title']} → [{part['from_i']} - {part['to_i']}]"
         builder.add(InlineKeyboardButton(
             text=label,
-            callback_data=f"schedule-days_{value}"
+            callback_data=f"ss-part-toggle_{part['id']}"
         ))
-    builder.add(InlineKeyboardButton(text=texts['back_text'], callback_data="schedule-back-to-type"))
-    return builder.adjust(2, 2, 2, 2, 1, 1).as_markup()
+    texts = await get_texts(('ss_btn_done', 'ss_btn_done_empty', 'ss_btn_back'))
+    done_text = texts['ss_btn_done'] if selected_ids else texts['ss_btn_done_empty']
+    builder.add(InlineKeyboardButton(
+        text=done_text,
+        callback_data="ss-parts-done" if selected_ids else "ss-parts-none"
+    ))
+    builder.add(InlineKeyboardButton(text=texts['ss_btn_back'], callback_data="ss-back-to-groups"))
+    return builder.adjust(1).as_markup()
 
 
-async def schedule_confirm_markup():
-    texts = await get_texts(('schedule_confirm_btn', 'schedule_cancel_btn'))
+async def ss_date_markup():
+    import pytz
+    from datetime import datetime, timedelta
+    # Use Tashkent's current date, not the server's local date
+    _tz = pytz.timezone('Asia/Tashkent')
+    today = datetime.now(_tz).date()
+    texts = await get_texts(('ss_date_today', 'ss_date_tomorrow', 'ss_date_day_after', 'ss_date_3days', 'ss_btn_back'))
+    d3 = today + timedelta(days=3)
+    days = [
+        (today, texts['ss_date_today']),
+        (today + timedelta(days=1), texts['ss_date_tomorrow']),
+        (today + timedelta(days=2), texts['ss_date_day_after']),
+        (d3, texts['ss_date_3days'].replace('__date', d3.strftime('%d.%m'))),
+    ]
     builder = InlineKeyboardBuilder()
-    builder.add(InlineKeyboardButton(text=texts['schedule_confirm_btn'], callback_data="schedule-confirm"))
-    builder.add(InlineKeyboardButton(text=texts['schedule_cancel_btn'], callback_data="schedule-cancel"))
-    return builder.adjust(2).as_markup()
+    for d, label in days:
+        builder.add(InlineKeyboardButton(
+            text=label,
+            callback_data=f"ss-date_{d.strftime('%d.%m.%Y')}"
+        ))
+    builder.add(InlineKeyboardButton(text=texts['ss_btn_back'], callback_data="ss-back-to-parts"))
+    return builder.adjust(2, 2, 1).as_markup()
+
+
+async def ss_confirm_markup():
+    texts = await get_texts(('ss_btn_confirm', 'ss_btn_cancel', 'ss_btn_back'))
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text=texts['ss_btn_confirm'], callback_data="ss-confirm"))
+    builder.add(InlineKeyboardButton(text=texts['ss_btn_cancel'], callback_data="ss-cancel"))
+    builder.add(InlineKeyboardButton(text=texts['ss_btn_back'], callback_data="ss-back-to-time"))
+    return builder.adjust(2, 1).as_markup()
+
+
+async def ss_list_markup(sessions: list):
+    import pytz
+    tz = pytz.timezone('Asia/Tashkent')
+    builder = InlineKeyboardBuilder()
+    for session in sessions:
+        local_dt = session.scheduled_at.astimezone(tz)
+        label = f"🗓 {session.group_title or session.group_id} — {local_dt.strftime('%d.%m %H:%M')}"
+        builder.add(InlineKeyboardButton(
+            text=label,
+            callback_data=f"ss-detail_{session.pk}"
+        ))
+    texts = await get_texts(('ss_btn_create_new', 'ss_btn_main_menu'))
+    builder.add(InlineKeyboardButton(text=texts['ss_btn_create_new'], callback_data="ss-create"))
+    builder.add(InlineKeyboardButton(text=texts['ss_btn_main_menu'], callback_data="back-to-main-menu"))
+    return builder.adjust(1).as_markup()
+
+
+async def ss_detail_markup(session_id: int):
+    texts = await get_texts(('ss_btn_cancel_session', 'ss_btn_back_to_list'))
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text=texts['ss_btn_cancel_session'], callback_data=f"ss-cancel-session_{session_id}"))
+    builder.add(InlineKeyboardButton(text=texts['ss_btn_back_to_list'], callback_data="menu-scheduled-sessions"))
+    return builder.adjust(1).as_markup()
 
 
 async def quiz_detail_edit_privacy_markup(quiz: dict, texts: dict):
@@ -328,15 +349,6 @@ async def admin_menu_markup(texts: dict):
 
     return builder.adjust(*(1, 1)).as_markup()
 
-
-
-async def test_group_continue_markup(group_id: str, index: int):
-    text = await get_text('testing_continue_button')
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text=text, callback_data=f"testing-group-continue-quiz_{group_id}_{index}")]
-        ]
-    )
 
 
 async def test_group_share_quiz(texts: dict, link: str, group_quiz_id: int = 0):

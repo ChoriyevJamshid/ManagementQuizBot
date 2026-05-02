@@ -1,6 +1,6 @@
 from django.db import models
 from utils.models import BaseModel
-from .choices import QuizStatus
+from .choices import QuizStatus, SessionStatus
 from . import managers
 
 
@@ -155,39 +155,27 @@ class GroupQuiz(BaseModel):
         super().save(*args, **kwargs)
 
 
-class ScheduledQuiz(BaseModel):
+class ScheduledSession(BaseModel):
     created_by = models.ForeignKey(
         "common.TelegramProfile",
         on_delete=models.CASCADE,
-        related_name="scheduled_quizzes"
-    )
-    quiz_part = models.ForeignKey(
-        QuizPart,
-        on_delete=models.CASCADE,
-        related_name="scheduled_quizzes"
+        related_name="scheduled_sessions"
     )
     group_id = models.CharField(max_length=63)
-    group_title = models.CharField(max_length=255, blank=True, null=True)
-
-    is_periodic = models.BooleanField(default=False)
-    hour = models.PositiveSmallIntegerField()
-    minute = models.PositiveSmallIntegerField()
-    days_of_week = models.CharField(max_length=31, default='*')
-    start_date = models.DateField(blank=True, null=True)
-
-    is_active = models.BooleanField(default=True)
-    periodic_task = models.OneToOneField(
-        'django_celery_beat.PeriodicTask',
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='scheduled_quiz'
+    group_title = models.CharField(max_length=255, blank=True)
+    part_ids = models.JSONField(default=list)
+    scheduled_at = models.DateTimeField()
+    status = models.CharField(
+        max_length=31,
+        choices=SessionStatus.choices,
+        default=SessionStatus.PENDING
     )
+    celery_task_ids = models.JSONField(default=list)
 
     objects = models.Manager()
 
     def __str__(self):
-        return f"ScheduledQuiz → {self.quiz_part} → {self.group_title or self.group_id}"
+        return f"ScheduledSession → {self.group_title or self.group_id} → {self.scheduled_at}"
 
 
 class TelegramCommand(BaseModel):
