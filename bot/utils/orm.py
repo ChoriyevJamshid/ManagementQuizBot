@@ -164,6 +164,24 @@ async def update_group_quiz(group_quiz):
 
 
 
+async def get_telegram_groups() -> list:
+    from asgiref.sync import sync_to_async
+    from common.models import TelegramGroup
+
+    def _inner():
+        groups = TelegramGroup.objects.filter(is_active=True).order_by('title')
+        return [
+            {
+                'group_id': str(g.telegram_id),
+                'title': g.title,
+                'username': g.username,
+            }
+            for g in groups
+        ]
+
+    return await sync_to_async(_inner)()
+
+
 async def get_distinct_groups(limit: int = 10) -> list:
     from asgiref.sync import sync_to_async
 

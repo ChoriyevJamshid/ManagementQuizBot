@@ -5,6 +5,7 @@ from bot.filters import ChatTypeFilter
 from bot.handlers.groups.main import *
 from bot.handlers.groups.testing import *
 from bot.handlers.groups.handle import *
+from bot.handlers.groups.admin_commands import add_group_handler
 
 
 def prepare_router() -> Router:
@@ -14,6 +15,7 @@ def prepare_router() -> Router:
 
     router.message.register(start_handler, CommandStart())
     router.message.register(stop_handler, Command("stop"))
+    router.message.register(add_group_handler, Command("add"))
 
     router.callback_query.register(
         send_excel_to_user_callback,

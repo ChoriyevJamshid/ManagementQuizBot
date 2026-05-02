@@ -3,8 +3,34 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin
 from import_export.admin import ImportExportModelAdmin as BaseImportExportModelAdmin
 
-from .models import Data, TelegramProfile
+from .models import Data, TelegramGroup, TelegramProfile
 from .resources import TelegramProfileResource
+
+
+@admin.register(TelegramGroup)
+class TelegramGroupAdmin(ModelAdmin):
+    compressed_fields = True
+    warn_unsaved_form = True
+    list_filter_submit = True
+
+    list_display = ("id", "telegram_id", "title", "username", "is_active", "added_by", "created_at")
+    list_display_links = ("telegram_id", "title")
+    list_editable = ("is_active",)
+    list_filter = ("is_active",)
+    search_fields = ("telegram_id", "title", "username")
+    list_per_page = 25
+    readonly_fields = ("created_at", "updated_at")
+
+    fieldsets = (
+        ("Group Info", {
+            "classes": ("tab",),
+            "fields": ("telegram_id", "title", "username", "invite_link", "is_active"),
+        }),
+        ("Meta", {
+            "classes": ("tab",),
+            "fields": ("added_by", "created_at", "updated_at"),
+        }),
+    )
 
 
 @admin.register(Data)

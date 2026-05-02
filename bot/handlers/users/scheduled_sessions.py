@@ -137,8 +137,14 @@ async def ss_create_handler(callback: types.CallbackQuery, state: FSMContext):
 
     logger.info("ss_create: user_id=%s started schedule creation", callback.from_user.id)
 
-    groups = await utils.get_distinct_groups()
-    logger.info("ss_create: user_id=%s fetched %d groups", callback.from_user.id, len(groups))
+    groups = await utils.get_telegram_groups()
+    logger.info("ss_create: user_id=%s fetched %d telegram groups", callback.from_user.id, len(groups))
+
+    if not groups:
+        text = await get_text('ss_no_groups')
+        await callback.message.edit_text(text)
+        await callback.answer()
+        return
 
     await state.update_data(ss_groups=groups, ss_selected_parts=[])
 

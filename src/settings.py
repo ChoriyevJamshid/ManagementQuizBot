@@ -332,6 +332,11 @@ UNFOLD = {
                 "separator": True,
                 "items": [
                     {
+                        "title": _("Telegram Groups"),
+                        "icon": "groups",
+                        "link": reverse_lazy("admin:common_telegramgroup_changelist"),
+                    },
+                    {
                         "title": _("Bot Commands"),
                         "icon": "terminal",
                         "link": reverse_lazy("admin:quiz_telegramcommand_changelist"),

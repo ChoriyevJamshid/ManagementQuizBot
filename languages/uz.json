@@ -215,5 +215,9 @@
   "ss_cancelled_due_to_active_quiz": "❌ Rejalashtirilgan test boshlanmadi: guruhda allaqachon faol test mavjud.",
   "not_allowed_role_global": "🚫 Bu bot faqat Admin va Moderatorlar uchun mo'ljallangan.",
   "ss_state_expired": "⚠️ Sessiya muddati tugadi. Iltimos, qaytadan boshlang.",
-  "ss_btn_back_to_quizzes": "🔙 Quizlar ro'yxatiga"
+  "ss_btn_back_to_quizzes": "🔙 Quizlar ro'yxatiga",
+  "ss_no_groups": "⚠️ Hali hech qanday guruh qo'shilmagan.\n\nGuruhda <b>/add</b> buyrug'ini ishlatib guruh qo'shing.",
+  "add_group_only_in_group": "❌ Bu buyruq faqat guruhlarda ishlaydi.",
+  "add_group_added": "✅ Guruh muvaffaqiyatli qo'shildi: <b>__title</b>",
+  "add_group_updated": "✅ Guruh ma'lumotlari yangilandi: <b>__title</b>"
 }
