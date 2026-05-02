@@ -108,23 +108,50 @@ async def ss_groups_markup(groups: list):
     return builder.adjust(1).as_markup()
 
 
-async def ss_parts_markup(all_parts: list, selected_ids: list):
+async def ss_parts_markup(all_parts: list, selected_ids: list, page: int = 0, page_size: int = 10):
+    total = len(all_parts)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    page = max(0, min(page, total_pages - 1))
+
+    page_parts = all_parts[page * page_size: (page + 1) * page_size]
+
     builder = InlineKeyboardBuilder()
-    for part in all_parts:
+    for part in page_parts:
         mark = "✅" if part['id'] in selected_ids else "☐"
-        label = f"{mark} {part['quiz_title']} → [{part['from_i']} - {part['to_i']}]"
+        raw = f"{mark} {part['quiz_title']} → [{part['from_i']} - {part['to_i']}]"
+        label = raw if len(raw) <= 38 else raw[:37] + '…'
         builder.add(InlineKeyboardButton(
             text=label,
             callback_data=f"ss-part-toggle_{part['id']}"
         ))
-    texts = await get_texts(('ss_btn_done', 'ss_btn_done_empty', 'ss_btn_back'))
-    done_text = texts['ss_btn_done'] if selected_ids else texts['ss_btn_done_empty']
-    builder.add(InlineKeyboardButton(
-        text=done_text,
-        callback_data="ss-parts-done" if selected_ids else "ss-parts-none"
-    ))
+
+    row_widths = [1] * len(page_parts)
+
+    if total_pages > 1:
+        prev_cb = f"ss-parts-page_{page - 1}" if page > 0 else "ss-parts-noop"
+        next_cb = f"ss-parts-page_{page + 1}" if page < total_pages - 1 else "ss-parts-noop"
+        builder.add(InlineKeyboardButton(text="◀", callback_data=prev_cb))
+        builder.add(InlineKeyboardButton(
+            text=f"{page + 1} / {total_pages}",
+            callback_data="ss-parts-noop",
+        ))
+        builder.add(InlineKeyboardButton(text="▶", callback_data=next_cb))
+        row_widths.append(3)
+
+    texts = await get_texts(('ss_btn_done_empty', 'ss_btn_back'))
+    if selected_ids:
+        done_text = f"✅ Tayyor ({len(selected_ids)} ta)"
+        done_cb = "ss-parts-done"
+    else:
+        done_text = texts['ss_btn_done_empty']
+        done_cb = "ss-parts-none"
+
+    builder.add(InlineKeyboardButton(text=done_text, callback_data=done_cb))
     builder.add(InlineKeyboardButton(text=texts['ss_btn_back'], callback_data="ss-back-to-groups"))
-    return builder.adjust(1).as_markup()
+    row_widths += [1, 1]
+
+    builder.adjust(*row_widths)
+    return builder.as_markup()
 
 
 async def ss_date_markup():

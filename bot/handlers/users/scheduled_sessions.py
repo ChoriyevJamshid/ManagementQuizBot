@@ -185,30 +185,36 @@ async def ss_group_id_entered_handler(message: types.Message, state: FSMContext)
         return await message.answer(text)
 
     await state.update_data(ss_group_id=group_id, ss_group_title=group_id)
+    logger.info("ss_group_id_entered: user_id=%s saved group_id=%s, proceeding to parts", message.from_user.id, group_id)
 
     class _FakeCallback:
-        message = message
-        async def answer(self): pass
+        def __init__(self, msg):
+            self.message = msg
+        async def answer(self, *args, **kwargs): pass
 
-    await _go_to_parts(_FakeCallback(), state, edit=False)
+    try:
+        await _go_to_parts(_FakeCallback(message), state, edit=False)
+    except Exception:
+        logger.exception("ss_group_id_entered: user_id=%s exception in _go_to_parts", message.from_user.id)
+        await message.answer("⚠️ Xatolik yuz berdi.")
 
 
 # ── Создание: шаг 2 — части квиза ────────────────────────────────────────────
 
-async def _go_to_parts(callback, state: FSMContext, edit: bool = True):
+async def _go_to_parts(callback, state: FSMContext, edit: bool = True, page: int = 0):
     all_parts = await utils.get_all_quiz_parts()
     data = await state.get_data()
     selected = data.get('ss_selected_parts', [])
 
     logger.info(
-        "_go_to_parts: all_parts_count=%d selected_count=%d",
-        len(all_parts), len(selected),
+        "_go_to_parts: all_parts_count=%d selected_count=%d page=%d",
+        len(all_parts), len(selected), page,
     )
 
-    await state.update_data(ss_all_parts=all_parts)
+    await state.update_data(ss_all_parts=all_parts, ss_parts_page=page)
 
     text = await get_text('ss_select_parts')
-    markup = await inline_kb.ss_parts_markup(all_parts, selected)
+    markup = await inline_kb.ss_parts_markup(all_parts, selected, page=page)
 
     if edit:
         await callback.message.edit_text(text, reply_markup=markup)
@@ -232,6 +238,7 @@ async def ss_part_toggle_handler(callback: types.CallbackQuery, state: FSMContex
 
     data = await state.get_data()
     selected = list(data.get('ss_selected_parts', []))
+    page = data.get('ss_parts_page', 0)
 
     if part_id in selected:
         selected.remove(part_id)
@@ -246,8 +253,36 @@ async def ss_part_toggle_handler(callback: types.CallbackQuery, state: FSMContex
     await state.update_data(ss_selected_parts=selected)
 
     all_parts = data.get('ss_all_parts', [])
-    markup = await inline_kb.ss_parts_markup(all_parts, selected)
+    markup = await inline_kb.ss_parts_markup(all_parts, selected, page=page)
     await callback.message.edit_reply_markup(reply_markup=markup)
+    await callback.answer()
+
+
+async def ss_parts_page_handler(callback: types.CallbackQuery, state: FSMContext):
+    try:
+        page = int(callback.data.split('_')[-1])
+    except (ValueError, IndexError):
+        logger.warning(
+            "ss_parts_page: user_id=%s failed to parse page from callback_data=%r",
+            callback.from_user.id, callback.data,
+        )
+        await callback.answer()
+        return
+
+    logger.info("ss_parts_page: user_id=%s navigating to page=%d", callback.from_user.id, page)
+
+    data = await state.get_data()
+    all_parts = data.get('ss_all_parts', [])
+    selected = data.get('ss_selected_parts', [])
+
+    await state.update_data(ss_parts_page=page)
+
+    markup = await inline_kb.ss_parts_markup(all_parts, selected, page=page)
+    await callback.message.edit_reply_markup(reply_markup=markup)
+    await callback.answer()
+
+
+async def ss_parts_noop_handler(callback: types.CallbackQuery):
     await callback.answer()
 
 
@@ -417,8 +452,9 @@ async def ss_back_to_parts_handler(callback: types.CallbackQuery, state: FSMCont
     data = await state.get_data()
     all_parts = data.get('ss_all_parts', [])
     selected = data.get('ss_selected_parts', [])
+    page = data.get('ss_parts_page', 0)
     text = await get_text('ss_select_parts')
-    markup = await inline_kb.ss_parts_markup(all_parts, selected)
+    markup = await inline_kb.ss_parts_markup(all_parts, selected, page=page)
     await callback.message.edit_text(text, reply_markup=markup)
     await state.set_state(ScheduledSessionState.select_parts)
     await callback.answer()

@@ -219,6 +219,16 @@ def prepare_router() -> Router:
         ScheduledSessionState.select_parts,
     )
     router.callback_query.register(
+        ss_parts_page_handler,
+        F.data.startswith('ss-parts-page_'),
+        ScheduledSessionState.select_parts,
+    )
+    router.callback_query.register(
+        ss_parts_noop_handler,
+        F.data == 'ss-parts-noop',
+        ScheduledSessionState.select_parts,
+    )
+    router.callback_query.register(
         ss_parts_none_handler,
         F.data == 'ss-parts-none',
         ScheduledSessionState.select_parts,
