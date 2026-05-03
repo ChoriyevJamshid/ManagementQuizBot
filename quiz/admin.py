@@ -1,6 +1,16 @@
 from django.contrib import admin
 from django.contrib import messages
 from unfold.admin import ModelAdmin, TabularInline
+from django_celery_beat.admin import (
+    PeriodicTaskAdmin,
+    CrontabScheduleAdmin,
+    IntervalScheduleAdmin,
+)
+from django_celery_beat.models import (
+    PeriodicTask,
+    CrontabSchedule,
+    IntervalSchedule,
+)
 
 from . import models
 from utils.bot import set_my_commands
@@ -288,3 +298,25 @@ class ScheduledSessionAdmin(ModelAdmin):
 
     def get_queryset(self, request):
         return super().get_queryset(request).select_related("created_by")
+
+
+# Re-register django-celery-beat models with unfold ModelAdmin
+# so the "Add" button and full UI are available in the admin panel.
+admin.site.unregister(PeriodicTask)
+admin.site.unregister(CrontabSchedule)
+admin.site.unregister(IntervalSchedule)
+
+
+@admin.register(PeriodicTask)
+class UnfoldPeriodicTaskAdmin(PeriodicTaskAdmin, ModelAdmin):
+    pass
+
+
+@admin.register(CrontabSchedule)
+class UnfoldCrontabScheduleAdmin(CrontabScheduleAdmin, ModelAdmin):
+    pass
+
+
+@admin.register(IntervalSchedule)
+class UnfoldIntervalScheduleAdmin(IntervalScheduleAdmin, ModelAdmin):
+    pass
