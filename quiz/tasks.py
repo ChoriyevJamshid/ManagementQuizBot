@@ -111,6 +111,80 @@ def remove_quiz_files():
     return None
 
 
+# ── Daily statistics task ─────────────────────────────────────────────────────
+
+@shared_task
+def send_daily_group_stats():
+    from django.utils import timezone
+    from datetime import timedelta
+
+    now = timezone.now()
+    since = now - timedelta(hours=24)
+
+    finished_quizzes = (
+        GroupQuiz.objects
+        .filter(
+            status=QuizStatus.FINISHED,
+            updated_at__gte=since,
+            data__isnull=False,
+        )
+        .values('group_id', 'data')
+    )
+
+    groups: dict = {}
+    for quiz in finished_quizzes:
+        group_id = quiz['group_id']
+        players = (quiz['data'] or {}).get('players', {})
+        group_agg = groups.setdefault(group_id, {})
+        for user_id, stats in players.items():
+            if user_id not in group_agg:
+                group_agg[user_id] = {
+                    'username': stats.get('username', 'Unknown'),
+                    'corrects': 0,
+                    'wrongs': 0,
+                    'spent_time': 0.0,
+                }
+            entry = group_agg[user_id]
+            entry['corrects'] += stats.get('corrects', 0)
+            entry['wrongs'] += stats.get('wrongs', 0)
+            entry['spent_time'] += stats.get('spent_time', 0.0)
+
+    date_str = now.strftime('%d.%m.%Y')
+    header = get_text_sync('daily_stats_header', {'date': date_str})
+
+    for group_id, players in groups.items():
+        if len(players) < 20:
+            continue
+
+        sorted_players = sorted(
+            players.items(),
+            key=lambda item: (
+                -(item[1]['corrects'] / (item[1]['corrects'] + item[1]['wrongs'])
+                  if (item[1]['corrects'] + item[1]['wrongs']) > 0 else 0.0),
+                item[1]['spent_time'],
+            ),
+        )[:20]
+
+        text = header + _build_daily_stats_rows(sorted_players)
+        send_text(chat_id=int(group_id), text=text)
+
+
+def _build_daily_stats_rows(players: list) -> str:
+    medals = {1: "🥇", 2: "🥈", 3: "🥉"}
+    rows = []
+    for rank, (_, stats) in enumerate(players, 1):
+        total = stats['corrects'] + stats['wrongs']
+        pct = stats['corrects'] / total * 100 if total else 0.0
+        mins = int(stats['spent_time'] // 60)
+        secs = int(stats['spent_time'] % 60)
+        prefix = medals.get(rank, f"{rank}.")
+        rows.append(
+            f"{prefix} {stats['username']} — {pct:.1f}%"
+            f" ({stats['corrects']}/{total}) | ⏱ {mins}:{secs:02d}"
+        )
+    return "\n".join(rows)
+
+
 # ── Scheduled Session tasks ───────────────────────────────────────────────────
 
 @shared_task

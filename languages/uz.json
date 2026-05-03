@@ -219,5 +219,6 @@
   "ss_no_groups": "⚠️ Hali hech qanday guruh qo'shilmagan.\n\nGuruhda <b>/add</b> buyrug'ini ishlatib guruh qo'shing.",
   "add_group_only_in_group": "❌ Bu buyruq faqat guruhlarda ishlaydi.",
   "add_group_added": "✅ Guruh muvaffaqiyatli qo'shildi: <b>__title</b>",
-  "add_group_updated": "✅ Guruh ma'lumotlari yangilandi: <b>__title</b>"
+  "add_group_updated": "✅ Guruh ma'lumotlari yangilandi: <b>__title</b>",
+  "daily_stats_header": "📊 <b>Kunlik natijalar — __date</b>\n\n🏆 <b>Eng faol ishtirokchilar (Top 20):</b>\n"
 }
