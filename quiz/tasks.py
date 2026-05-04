@@ -153,8 +153,8 @@ def send_daily_group_stats():
     header = get_text_sync('daily_stats_header', {'date': date_str})
 
     for group_id, players in groups.items():
-        if len(players) < 5:
-            continue
+        # if len(players) < 5:
+        #     continue
 
         sorted_players = sorted(
             players.items(),
