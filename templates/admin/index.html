@@ -1,0 +1,180 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block breadcrumbs %}{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    {# ── KPI Cards ─────────────────────────────────────────────────────────── #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {% for card in kpi %}
+        <div class="bg-white border border-base-200 rounded-default p-5 shadow-xs dark:bg-base-900 dark:border-base-800 flex flex-col gap-2">
+            <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-base-500 dark:text-base-400">{{ card.title }}</span>
+                {% if card.icon %}
+                <span class="material-symbols-outlined text-base-300 dark:text-base-600 text-xl!">{{ card.icon }}</span>
+                {% endif %}
+            </div>
+            <p class="text-3xl font-bold text-base-900 dark:text-base-100">{{ card.metric }}</p>
+            {% if card.footer %}
+            <p class="text-xs text-base-400 dark:text-base-500">{{ card.footer }}</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {# ── Charts Row 1: Line + Bar ───────────────────────────────────────────── #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        <div class="bg-white border border-base-200 rounded-default p-6 shadow-xs dark:bg-base-900 dark:border-base-800">
+            <h2 class="font-semibold text-[15px] text-base-900 dark:text-base-100 mb-4">
+                {% trans "New Users (last 14 days)" %}
+            </h2>
+            <div class="relative w-full">
+                <canvas class="chart" data-type="line" data-value="{{ user_chart_data }}" height="120"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white border border-base-200 rounded-default p-6 shadow-xs dark:bg-base-900 dark:border-base-800">
+            <h2 class="font-semibold text-[15px] text-base-900 dark:text-base-100 mb-4">
+                {% trans "Quiz Activity (last 14 days)" %}
+            </h2>
+            <div class="relative w-full">
+                <canvas class="chart" data-type="bar" data-value="{{ quiz_chart_data }}" height="120"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    {# ── Charts Row 2: Doughnuts ────────────────────────────────────────────── #}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        <div class="bg-white border border-base-200 rounded-default p-6 shadow-xs dark:bg-base-900 dark:border-base-800">
+            <h2 class="font-semibold text-[15px] text-base-900 dark:text-base-100 mb-4">
+                {% trans "Quiz Sessions by Status" %}
+            </h2>
+            <div class="relative w-full flex justify-center">
+                <canvas class="chart" data-type="doughnut" data-value="{{ userquiz_status_chart }}" height="200" width="200"></canvas>
+            </div>
+        </div>
+
+        <div class="bg-white border border-base-200 rounded-default p-6 shadow-xs dark:bg-base-900 dark:border-base-800">
+            <h2 class="font-semibold text-[15px] text-base-900 dark:text-base-100 mb-4">
+                {% trans "Support Messages by Status" %}
+            </h2>
+            <div class="relative w-full flex justify-center">
+                <canvas class="chart" data-type="doughnut" data-value="{{ support_status_chart }}" height="200" width="200"></canvas>
+            </div>
+        </div>
+
+    </div>
+
+    {# ── Recent Items ──────────────────────────────────────────────────────── #}
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        {# Recent users #}
+        <div class="bg-white border border-base-200 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-base-200 dark:border-base-800">
+                <h2 class="font-semibold text-[15px] text-base-900 dark:text-base-100">
+                    {% trans "Recent Users" %}
+                </h2>
+                <a href="{% url 'admin:common_telegramprofile_changelist' %}"
+                   class="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400">
+                    {% trans "View all" %} →
+                </a>
+            </div>
+            <ul class="divide-y divide-base-100 dark:divide-base-800">
+                {% for user in recent_users %}
+                <li>
+                    <a href="{{ user.url }}"
+                       class="flex items-center justify-between px-5 py-3 hover:bg-base-50 dark:hover:bg-base-800/50 transition-colors">
+                        <div>
+                            <p class="text-sm font-medium text-base-900 dark:text-base-100">{{ user.name }}</p>
+                            <p class="text-xs text-base-400">{{ user.username }}</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs px-2 py-0.5 rounded-full
+                                {% if user.role == 'admin' %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400
+                                {% elif user.role == 'moderator' %}bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400
+                                {% else %}bg-base-100 text-base-500 dark:bg-base-800 dark:text-base-400{% endif %}">
+                                {{ user.role }}
+                            </span>
+                            {% if user.registered %}
+                            <span class="material-symbols-outlined text-green-500 text-sm!">check_circle</span>
+                            {% endif %}
+                        </div>
+                    </a>
+                </li>
+                {% empty %}
+                <li class="px-5 py-4 text-sm text-base-400">{% trans "No users yet." %}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {# Pending support #}
+        <div class="bg-white border border-base-200 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-base-200 dark:border-base-800">
+                <h2 class="font-semibold text-[15px] text-base-900 dark:text-base-100">
+                    {% trans "Pending Support" %}
+                </h2>
+                <a href="{% url 'admin:support_supportmessage_changelist' %}"
+                   class="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400">
+                    {% trans "View all" %} →
+                </a>
+            </div>
+            <ul class="divide-y divide-base-100 dark:divide-base-800">
+                {% for msg in recent_support %}
+                <li>
+                    <a href="{{ msg.url }}"
+                       class="flex flex-col px-5 py-3 hover:bg-base-50 dark:hover:bg-base-800/50 transition-colors">
+                        <p class="text-sm text-base-900 dark:text-base-100 leading-snug">{{ msg.question }}</p>
+                        <div class="flex items-center justify-between mt-1">
+                            <p class="text-xs text-base-400">{{ msg.owner }}</p>
+                            <p class="text-xs text-base-400">{{ msg.date }}</p>
+                        </div>
+                    </a>
+                </li>
+                {% empty %}
+                <li class="px-5 py-4 text-sm text-base-400">{% trans "No pending messages." %}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {# Upcoming scheduled sessions #}
+        <div class="bg-white border border-base-200 rounded-default shadow-xs dark:bg-base-900 dark:border-base-800 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-base-200 dark:border-base-800">
+                <h2 class="font-semibold text-[15px] text-base-900 dark:text-base-100">
+                    {% trans "Upcoming Sessions" %}
+                </h2>
+                <a href="{% url 'admin:quiz_scheduledsession_changelist' %}"
+                   class="text-xs text-primary-600 hover:text-primary-700 dark:text-primary-400">
+                    {% trans "View all" %} →
+                </a>
+            </div>
+            <ul class="divide-y divide-base-100 dark:divide-base-800">
+                {% for session in upcoming_sessions %}
+                <li>
+                    <a href="{{ session.url }}"
+                       class="flex items-center justify-between px-5 py-3 hover:bg-base-50 dark:hover:bg-base-800/50 transition-colors">
+                        <div>
+                            <p class="text-sm font-medium text-base-900 dark:text-base-100">{{ session.group_title }}</p>
+                            <p class="text-xs text-base-400">{{ session.scheduled_at }}</p>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded-full
+                            {% if session.status == 'running' %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400
+                            {% else %}bg-base-100 text-base-500 dark:bg-base-800 dark:text-base-400{% endif %}">
+                            {{ session.status }}
+                        </span>
+                    </a>
+                </li>
+                {% empty %}
+                <li class="px-5 py-4 text-sm text-base-400">{% trans "No upcoming sessions." %}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
