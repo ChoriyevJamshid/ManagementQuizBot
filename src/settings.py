@@ -194,6 +194,11 @@ REDIS_URL = f'redis://{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}'
 CELERY_BROKER_URL = env.str("CELERY_BROKER_URL", "redis://localhost:6379")
 CELERY_RESULT_BACKEND = env.str("CELERY_BROKER_URL", "redis://localhost:6379")
 CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    # Must be longer than the furthest future ETA you ever schedule.
+    # 7 days covers "schedule 5 days ahead" with margin.
+    'visibility_timeout': 604800,
+}
 
 CKEDITOR_CONFIGS = {
     'default': {

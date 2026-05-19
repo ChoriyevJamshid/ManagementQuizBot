@@ -189,8 +189,24 @@ def _build_daily_stats_rows(players: list) -> str:
 
 @shared_task
 def notify_scheduled_session(session_id: int, label: str):
+    import redis as _sync_redis
     from quiz.models import ScheduledSession
     from quiz.choices import SessionStatus
+
+    # Idempotency guard: if multiple worker threads picked up this task due to
+    # visibility_timeout cycling, only the first one actually sends the message.
+    _r = _sync_redis.from_url(settings.REDIS_URL, decode_responses=True)
+    try:
+        lock_key = f"session:{session_id}:notified:{label}"
+        acquired = _r.set(lock_key, '1', nx=True, ex=86400)
+        if not acquired:
+            logger.info(
+                "notify_scheduled_session: session=%d label=%s already sent — skipping duplicate",
+                session_id, label,
+            )
+            return
+    finally:
+        _r.close()
 
     session = ScheduledSession.objects.filter(
         pk=session_id, status=SessionStatus.PENDING
@@ -297,9 +313,13 @@ async def _run_all_parts(session_id: int, bot) -> None:
         await ScheduledSession.objects.filter(pk=session_id).aupdate(status=SessionStatus.COMPLETED)
         return
 
-    await ScheduledSession.objects.filter(
+    updated = await ScheduledSession.objects.filter(
         pk=session_id, status=SessionStatus.PENDING
     ).aupdate(status=SessionStatus.RUNNING)
+    if not updated:
+        # Another worker already claimed this session (race due to visibility_timeout).
+        logger.info("Session %d: not in PENDING state — skipping duplicate worker", session_id)
+        return
     # Re-fetch so session.status is current for the rest of the function
     session = await ScheduledSession.objects.select_related('created_by').filter(pk=session_id).afirst()
 
