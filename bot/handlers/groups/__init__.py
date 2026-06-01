@@ -5,7 +5,6 @@ from bot.filters import ChatTypeFilter
 from bot.handlers.groups.main import *
 from bot.handlers.groups.testing import *
 from bot.handlers.groups.handle import *
-from bot.handlers.groups.admin_commands import add_group_handler
 
 
 def prepare_router() -> Router:
@@ -13,9 +12,13 @@ def prepare_router() -> Router:
 
     router.message.filter(ChatTypeFilter(("group", "supergroup")))
 
+    router.my_chat_member.register(
+        bot_group_member_updated,
+        ChatTypeFilter(chat_types=("group", "supergroup")),
+    )
+
     router.message.register(start_handler, CommandStart())
     router.message.register(stop_handler, Command("stop"))
-    router.message.register(add_group_handler, Command("add"))
 
     router.callback_query.register(
         send_excel_to_user_callback,
@@ -25,4 +28,3 @@ def prepare_router() -> Router:
     router.poll_answer.register(testing_group_poll_answer_handler)
 
     return router
-

@@ -16,7 +16,35 @@ from .common import get_creator, check_user_role
 from .statistics import send_statistics
 from .testing import start_group_testing
 
+ACTIVE_STATUSES = {ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR}
+
 logger = logging.getLogger(__name__)
+
+
+async def bot_group_member_updated(event: types.ChatMemberUpdated):
+    new_status = event.new_chat_member.status
+
+    if new_status in ACTIVE_STATUSES:
+        try:
+            admins = await event.bot.get_chat_administrators(event.chat.id)
+        except Exception:
+            logger.exception("bot_group_member_updated: failed to get admins for %s", event.chat.id)
+            admins = []
+
+        admin_tg_ids = [a.user.id for a in admins if not a.user.is_bot]
+        privileged = await utils.get_privileged_profile_by_tg_ids(admin_tg_ids)
+
+        await utils.add_or_update_telegram_group(
+            telegram_id=event.chat.id,
+            title=event.chat.title,
+            username=getattr(event.chat, 'username', None),
+            added_by_pk=privileged.pk if privileged else None,
+        )
+        logger.info("bot_group_member_updated: group %s added/updated in DB", event.chat.id)
+
+    elif new_status in {ChatMemberStatus.LEFT, ChatMemberStatus.BANNED}:
+        await utils.deactivate_telegram_group(event.chat.id)
+        logger.info("bot_group_member_updated: group %s deactivated in DB", event.chat.id)
 
 
 async def send_quiz_ready_message(message, quiz_part):
