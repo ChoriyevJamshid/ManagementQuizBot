@@ -47,6 +47,14 @@ async def bot_group_member_updated(event: types.ChatMemberUpdated):
         logger.info("bot_group_member_updated: group %s deactivated in DB", event.chat.id)
 
 
+async def group_title_updated(message: types.Message):
+    await utils.update_telegram_group_title(
+        telegram_id=message.chat.id,
+        title=message.new_chat_title,
+    )
+    logger.info("group_title_updated: group %s title changed to %r", message.chat.id, message.new_chat_title)
+
+
 async def send_quiz_ready_message(message, quiz_part):
     text = await get_text(
         "testing_group_quiz_part_ready_info",

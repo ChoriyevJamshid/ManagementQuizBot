@@ -211,6 +211,15 @@ async def deactivate_telegram_group(telegram_id: int) -> None:
     )()
 
 
+async def update_telegram_group_title(telegram_id: int, title: str) -> None:
+    from asgiref.sync import sync_to_async
+    from common.models import TelegramGroup
+
+    await sync_to_async(
+        lambda: TelegramGroup.objects.filter(telegram_id=telegram_id, is_active=True).update(title=title)
+    )()
+
+
 async def get_telegram_groups() -> list:
     from asgiref.sync import sync_to_async
     from common.models import TelegramGroup

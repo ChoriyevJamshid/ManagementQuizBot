@@ -19,6 +19,7 @@ def prepare_router() -> Router:
 
     router.message.register(start_handler, CommandStart())
     router.message.register(stop_handler, Command("stop"))
+    router.message.register(group_title_updated, F.new_chat_title)
 
     router.callback_query.register(
         send_excel_to_user_callback,
