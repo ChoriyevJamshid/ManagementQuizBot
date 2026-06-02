@@ -42,7 +42,7 @@ async def bot_group_member_updated(event: types.ChatMemberUpdated):
         )
         logger.info("bot_group_member_updated: group %s added/updated in DB", event.chat.id)
 
-    elif new_status in {ChatMemberStatus.LEFT, ChatMemberStatus.BANNED}:
+    elif new_status in {ChatMemberStatus.LEFT, ChatMemberStatus.KICKED}:
         await utils.deactivate_telegram_group(event.chat.id)
         logger.info("bot_group_member_updated: group %s deactivated in DB", event.chat.id)
 
