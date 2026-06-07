@@ -220,5 +220,6 @@
   "add_group_only_in_group": "❌ Bu buyruq faqat guruhlarda ishlaydi.",
   "add_group_added": "✅ Guruh muvaffaqiyatli qo'shildi: <b>__title</b>",
   "add_group_updated": "✅ Guruh ma'lumotlari yangilandi: <b>__title</b>",
-  "daily_stats_header": "📊 <b>Kunlik natijalar — __date</b>\n\n🏆 <b>Eng faol ishtirokchilar (Top 20):</b>\n"
+  "daily_stats_header": "📊 <b>Kunlik natijalar — __date</b>\n\n🏆 <b>Eng faol ishtirokchilar (Top 20):</b>\n",
+  "weekly_stats_header": "📊 <b>Haftalik natijalar — __week</b>\n\n🏆 <b>Eng faol ishtirokchilar (Top 20):</b>\n"
 }

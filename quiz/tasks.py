@@ -111,16 +111,31 @@ def remove_quiz_files():
     return None
 
 
-# ── Daily statistics task ─────────────────────────────────────────────────────
+# ── Daily / Weekly statistics tasks ──────────────────────────────────────────
 
 @shared_task
 def send_daily_group_stats():
     from django.utils import timezone
     from datetime import timedelta
-
     now = timezone.now()
-    since = now - timedelta(hours=24)
+    groups = _collect_group_stats(since=now - timedelta(hours=24))
+    header = get_text_sync('daily_stats_header', {'date': now.strftime('%d.%m.%Y')})
+    _dispatch_group_stats(groups, header)
 
+
+@shared_task
+def send_weekly_group_stats():
+    from django.utils import timezone
+    from datetime import timedelta
+    now = timezone.now()
+    since = now - timedelta(days=7)
+    groups = _collect_group_stats(since=since)
+    week_str = f"{since.strftime('%d.%m.%Y')} – {now.strftime('%d.%m.%Y')}"
+    header = get_text_sync('weekly_stats_header', {'week': week_str})
+    _dispatch_group_stats(groups, header)
+
+
+def _collect_group_stats(since) -> dict:
     finished_quizzes = (
         GroupQuiz.objects
         .filter(
@@ -130,7 +145,6 @@ def send_daily_group_stats():
         )
         .values('group_id', 'data')
     )
-
     groups: dict = {}
     for quiz in finished_quizzes:
         group_id = quiz['group_id']
@@ -148,23 +162,20 @@ def send_daily_group_stats():
             entry['corrects'] += stats.get('corrects', 0)
             entry['wrongs'] += stats.get('wrongs', 0)
             entry['spent_time'] += stats.get('spent_time', 0.0)
+    return groups
 
-    date_str = now.strftime('%d.%m.%Y')
-    header = get_text_sync('daily_stats_header', {'date': date_str})
 
+def _dispatch_group_stats(groups: dict, header: str) -> None:
     for group_id, players in groups.items():
-        # if len(players) < 5:
-        #     continue
-
         sorted_players = sorted(
             players.items(),
             key=lambda item: (
-                -(item[1]['corrects'] + item[1]['wrongs']),
+                -(item[1]['corrects'] / (item[1]['corrects'] + item[1]['wrongs'])
+                  if (item[1]['corrects'] + item[1]['wrongs']) > 0 else 0.0),
                 -item[1]['corrects'],
                 item[1]['spent_time'],
             ),
         )[:20]
-
         text = header + "\n\n" + _build_daily_stats_rows(sorted_players)
         send_text(chat_id=int(group_id), text=text)
 
@@ -174,13 +185,14 @@ def _build_daily_stats_rows(players: list) -> str:
     rows = []
     for rank, (_, stats) in enumerate(players, 1):
         total = stats['corrects'] + stats['wrongs']
-        score = (stats['corrects'] ** 2) / total if total else 0.0
-        mins = int(stats['spent_time'] // 60)
+        accuracy = round(stats['corrects'] / total * 100) if total else 0
+        hours = int(stats['spent_time'] // 3600)
+        mins = int((stats['spent_time'] % 3600) // 60)
         secs = int(stats['spent_time'] % 60)
-        prefix = medals.get(rank, f"{rank}.")
+        prefix = medals.get(rank, "🔸")
         rows.append(
-            f"{prefix} {stats['username']} — {score:.1f} ball"
-            f" ({stats['corrects']}/{total}) | ⏱ {mins}:{secs:02d}"
+            f"{prefix} {rank}. {stats['username']} — {stats['corrects']} ball\n"
+            f"       (Javoblar: {total}, Aniqlik: {accuracy}%, Vaqt: {hours:02d}:{mins:02d}:{secs:02d})"
         )
     return "\n".join(rows)
 
