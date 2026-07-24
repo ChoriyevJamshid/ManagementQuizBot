@@ -25,8 +25,9 @@ class LoggingMiddleware(BaseMiddleware):
             if handler_obj and hasattr(handler_obj, "callback"):
                  handler_name = handler_obj.callback.__name__
 
-            print(f"Handler '{handler_name}' executed in {execution_time:.4f} seconds")
-            print(f"User: {event.from_user.full_name} - {event.from_user.id}")
-            
-            logging.info(f"Handler '{handler_name}' executed in {execution_time:.4f} seconds")
-            logging.info(f"User: {event.from_user.full_name} - {event.from_user.id}")
+            logger.info("Handler '%s' executed in %.4f seconds", handler_name, execution_time)
+
+            # Anonymous/channel-authored group messages have no from_user.
+            from_user = getattr(event, "from_user", None)
+            if from_user:
+                logger.info("User: %s - %s", from_user.full_name, from_user.id)

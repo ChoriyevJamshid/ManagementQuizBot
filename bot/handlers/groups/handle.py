@@ -3,6 +3,7 @@ import logging
 import os
 
 from aiogram import types
+from aiogram.exceptions import TelegramForbiddenError
 from asgiref.sync import sync_to_async
 from django.core.files.base import ContentFile
 from django.utils.timezone import now
@@ -51,6 +52,9 @@ async def send_excel_to_user_callback(callback: types.CallbackQuery):
                 )
                 text = await get_text("statistics_file_sent")
                 return await callback.answer(text, show_alert=True)
+        except TelegramForbiddenError:
+            text = await get_text("group_quiz_dm_forbidden")
+            return await callback.answer(text, show_alert=True)
         except Exception:
             logger.exception("Failed to serve statistics file for quiz %s", quiz_id)
 
@@ -67,10 +71,19 @@ async def send_excel_to_user_callback(callback: types.CallbackQuery):
 
     file_bytes = await asyncio.to_thread(create_excel_statistics, sorted_players, quantity, timer)
 
-    await callback.bot.send_document(
-        chat_id=callback.from_user.id,
-        document=types.BufferedInputFile(file_bytes, filename=file_name),
-    )
+    try:
+        await callback.bot.send_document(
+            chat_id=callback.from_user.id,
+            document=types.BufferedInputFile(file_bytes, filename=file_name),
+        )
+    except TelegramForbiddenError:
+        text = await get_text("group_quiz_dm_forbidden")
+        return await callback.answer(text, show_alert=True)
+    except Exception:
+        logger.exception("Failed to send generated statistics file for quiz %s", quiz_id)
+        text = await get_text("group_quiz_no_file_please_wait")
+        return await callback.answer(text, show_alert=True)
+
     text = await get_text("statistics_file_sent")
     await callback.answer(text, show_alert=True)
 

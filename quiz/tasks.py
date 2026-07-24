@@ -91,6 +91,8 @@ def cleanup_stale_group_quizzes():
                 f"group_quiz:{pk}:current",
                 f"group_quiz:{pk}:questions",
                 f"group_quiz:{pk}:active",
+                f"group_quiz:{pk}:answered",
+                f"group_quiz:{pk}:skip_count",
             )
         logger.warning("cleanup_stale_group_quizzes: cancelled %d stale records: %s", len(stale_pks), stale_pks)
     finally:
@@ -263,15 +265,19 @@ def _run_session(session_id: int) -> None:
     from quiz.choices import SessionStatus
 
     async def _run():
-        # Fresh Redis client for this event loop — module-level client may be
-        # tied to a different (bot process) loop.
-        redis_group.redis_client = aioredis.from_url(
+        # Fresh Redis client for this event loop, scoped via contextvars so it
+        # never leaks into (or gets clobbered by) another ScheduledSession
+        # running concurrently in a different worker thread. See
+        # bot/utils/redis_group.py for why a plain module attribute is unsafe
+        # under --pool=threads.
+        session_redis_client = aioredis.from_url(
             settings.REDIS_URL,
             decode_responses=True,
             max_connections=50,
             socket_timeout=5,
             socket_connect_timeout=5,
         )
+        redis_token = redis_group.bind_redis_client(session_redis_client)
         bot = Bot(
             token=settings.API_TOKEN,
             default=DefaultBotProperties(parse_mode=ParseMode.HTML),
@@ -287,7 +293,8 @@ def _run_session(session_id: int) -> None:
             ).update(status=SessionStatus.CANCELLED)
         finally:
             await bot.session.close()
-            await redis_group.redis_client.aclose()
+            await session_redis_client.aclose()
+            redis_group.unbind_redis_client(redis_token)
 
     try:
         asyncio.run(_run())
@@ -433,7 +440,7 @@ async def _launch_one_part(session, part_index: int, part_id: int, bot) -> 'Grou
 
     if existing:
         if existing.status == QuizStatus.STARTED:
-            is_active = await redis_group.redis_client.exists(f"group_quiz:{existing.pk}:active") == 1
+            is_active = await redis_group.get_redis_client().exists(f"group_quiz:{existing.pk}:active") == 1
             if not is_active:
                 # Stale STARTED record — clean up and proceed
                 logger.warning(
@@ -442,7 +449,7 @@ async def _launch_one_part(session, part_index: int, part_id: int, bot) -> 'Grou
                 )
                 stale_pk = str(existing.pk)
                 await GQ.objects.filter(pk=existing.pk).aupdate(status=QuizStatus.CANCELED)
-                await redis_group.redis_client.delete(
+                await redis_group.get_redis_client().delete(
                     f"group_quiz:{stale_pk}:players",
                     f"group_quiz:{stale_pk}:scores",
                     f"group_quiz:{stale_pk}:wrongs",
@@ -451,6 +458,8 @@ async def _launch_one_part(session, part_index: int, part_id: int, bot) -> 'Grou
                     f"group_quiz:{stale_pk}:current",
                     f"group_quiz:{stale_pk}:questions",
                     f"group_quiz:{stale_pk}:active",
+                    f"group_quiz:{stale_pk}:answered",
+                    f"group_quiz:{stale_pk}:skip_count",
                 )
                 # Fall through to start normally
             else:

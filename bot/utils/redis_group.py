@@ -1,10 +1,13 @@
+import contextvars
 import orjson
 import redis.asyncio as redis
 from django.conf import settings
 
 # Explicit pool: 50+ players × multiple groups → need headroom for concurrent commands.
 # Each active group quiz can fire 50+ poll_answer events simultaneously.
-redis_client = redis.from_url(
+# Used by the webhook process (single event loop per process, so a single
+# shared client is safe there).
+_default_redis_client = redis.from_url(
     settings.REDIS_URL,
     decode_responses=True,
     max_connections=100,
@@ -12,7 +15,29 @@ redis_client = redis.from_url(
     socket_connect_timeout=5,
 )
 
+# Celery worker runs with --pool=threads: many OS threads share this module,
+# each running its own asyncio event loop (one per ScheduledSession). A plain
+# module-level client would get reassigned by whichever session started last,
+# breaking every other session running concurrently in another thread
+# ("Future attached to a different loop"). ContextVar gives each thread (and
+# everything awaited underneath it) its own isolated value, with no locking
+# needed — see bind_redis_client / get_redis_client.
+_redis_client_ctx: contextvars.ContextVar = contextvars.ContextVar("redis_client")
+
 _QUIZ_TTL = 86400  # 24 hours
+
+
+def get_redis_client():
+    return _redis_client_ctx.get(_default_redis_client)
+
+
+def bind_redis_client(client) -> contextvars.Token:
+    """Scopes `client` to the current thread's context. Pair with unbind_redis_client."""
+    return _redis_client_ctx.set(client)
+
+
+def unbind_redis_client(token: contextvars.Token) -> None:
+    _redis_client_ctx.reset(token)
 
 
 # -----------------------------
@@ -36,7 +61,7 @@ async def increment_player_score(
     times_key = f"group_quiz:{group_quiz_id}:times"
     usernames_key = f"group_quiz:{group_quiz_id}:usernames"
 
-    pipe = redis_client.pipeline()
+    pipe = get_redis_client().pipeline()
 
     pipe.sadd(players_key, user_id)
     pipe.expire(players_key, _QUIZ_TTL)
@@ -73,7 +98,7 @@ async def get_all_players_data(group_quiz_id: str) -> dict:
     usernames_key = f"group_quiz:{group_quiz_id}:usernames"
     players_key = f"group_quiz:{group_quiz_id}:players"
 
-    pipe = redis_client.pipeline()
+    pipe = get_redis_client().pipeline()
     pipe.smembers(players_key)
     pipe.hgetall(scores_key)
     pipe.hgetall(wrongs_key)
@@ -104,7 +129,7 @@ async def set_group_question_data(group_quiz_id: str, correct_option_id: int, st
 
     key = f"group_quiz:{group_quiz_id}:current"
 
-    pipe = redis_client.pipeline()
+    pipe = get_redis_client().pipeline()
     pipe.hset(key, mapping={
         "correct_option_id": str(correct_option_id),
         "start_time": str(start_time)
@@ -119,7 +144,7 @@ async def get_group_question_data(group_quiz_id: str) -> dict:
     """
 
     key = f"group_quiz:{group_quiz_id}:current"
-    data = await redis_client.hgetall(key)
+    data = await get_redis_client().hgetall(key)
 
     if not data:
         return {"correct_option_id": 10, "start_time": 0.0}
@@ -140,7 +165,7 @@ async def store_questions_data(group_quiz_id: str, questions: list) -> None:
     Prevents re-shuffling on quiz continue.
     """
     key = f"group_quiz:{group_quiz_id}:questions"
-    await redis_client.set(key, orjson.dumps(questions).decode(), ex=_QUIZ_TTL)
+    await get_redis_client().set(key, orjson.dumps(questions).decode(), ex=_QUIZ_TTL)
 
 
 async def get_questions_data(group_quiz_id: str) -> list | None:
@@ -149,7 +174,7 @@ async def get_questions_data(group_quiz_id: str) -> list | None:
     Returns None if key is missing.
     """
     key = f"group_quiz:{group_quiz_id}:questions"
-    raw = await redis_client.get(key)
+    raw = await get_redis_client().get(key)
     if not raw:
         return None
     return orjson.loads(raw)
@@ -161,17 +186,56 @@ async def get_questions_data(group_quiz_id: str) -> list | None:
 
 async def set_quiz_active(group_quiz_id: str) -> None:
     key = f"group_quiz:{group_quiz_id}:active"
-    await redis_client.set(key, "1", ex=_QUIZ_TTL)
+    await get_redis_client().set(key, "1", ex=_QUIZ_TTL)
 
 
 async def is_quiz_active(group_quiz_id: str) -> bool:
     key = f"group_quiz:{group_quiz_id}:active"
-    return await redis_client.exists(key) == 1
+    return await get_redis_client().exists(key) == 1
 
 
 async def set_quiz_inactive(group_quiz_id: str) -> None:
     key = f"group_quiz:{group_quiz_id}:active"
-    await redis_client.delete(key)
+    await get_redis_client().delete(key)
+
+
+# -----------------------------
+# NO-ANSWER DETECTION (auto-stop when nobody is answering)
+# -----------------------------
+
+async def reset_question_answered(group_quiz_id: str) -> None:
+    """Call right before/while sending a new question."""
+    key = f"group_quiz:{group_quiz_id}:answered"
+    await get_redis_client().delete(key)
+
+
+async def set_question_answered(group_quiz_id: str) -> bool:
+    """
+    Marks the current question as answered. SET NX — returns True only for
+    the first caller (i.e. the first answer received for this question).
+    """
+    key = f"group_quiz:{group_quiz_id}:answered"
+    return bool(await get_redis_client().set(key, "1", nx=True, ex=_QUIZ_TTL))
+
+
+async def is_question_answered(group_quiz_id: str) -> bool:
+    key = f"group_quiz:{group_quiz_id}:answered"
+    return await get_redis_client().exists(key) == 1
+
+
+async def increment_skips(group_quiz_id: str) -> int:
+    """Increments and returns the consecutive-no-answer counter."""
+    key = f"group_quiz:{group_quiz_id}:skip_count"
+    pipe = get_redis_client().pipeline()
+    pipe.incr(key)
+    pipe.expire(key, _QUIZ_TTL)
+    result, _ = await pipe.execute()
+    return result
+
+
+async def reset_skips(group_quiz_id: str) -> None:
+    key = f"group_quiz:{group_quiz_id}:skip_count"
+    await get_redis_client().delete(key)
 
 
 # -----------------------------
@@ -192,6 +256,8 @@ async def delete_group_quiz_data(group_quiz_id: str) -> None:
         f"group_quiz:{group_quiz_id}:current",
         f"group_quiz:{group_quiz_id}:questions",
         f"group_quiz:{group_quiz_id}:active",
+        f"group_quiz:{group_quiz_id}:answered",
+        f"group_quiz:{group_quiz_id}:skip_count",
     ]
 
-    await redis_client.delete(*keys)
+    await get_redis_client().delete(*keys)

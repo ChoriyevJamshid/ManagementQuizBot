@@ -1,9 +1,13 @@
+import logging
+
 from aiogram import types
 from aiogram.fsm.context import FSMContext
 
 from bot import utils
 from bot.keyboards import inline_kb
 from bot.utils.functions import get_text, get_texts
+
+logger = logging.getLogger(__name__)
 
 
 
@@ -38,6 +42,10 @@ async def testing_inline_query(query: types.InlineQuery):
         quiz_part = await utils.get_quiz_part_by_id(int(parameter))
     else:
         quiz_part = await utils.get_quiz_part(parameter)
+
+    if not quiz_part:
+        logger.info("testing_inline_query: quiz part not found for query=%r", query.query)
+        return await query.answer(results=[], cache_time=0)
 
     data_solo = await utils.get_data_solo()
 
