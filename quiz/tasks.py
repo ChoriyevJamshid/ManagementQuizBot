@@ -116,8 +116,6 @@ def cleanup_stale_group_quizzes():
                 f"group_quiz:{pk}:current",
                 f"group_quiz:{pk}:questions",
                 f"group_quiz:{pk}:active",
-                f"group_quiz:{pk}:answered",
-                f"group_quiz:{pk}:skip_count",
             )
         logger.warning("cleanup_stale_group_quizzes: cancelled %d stale records: %s", len(stale_pks), stale_pks)
     finally:
@@ -679,8 +677,6 @@ async def _cleanup_stale_group_quiz(pk: int) -> None:
         f"group_quiz:{stale_pk}:current",
         f"group_quiz:{stale_pk}:questions",
         f"group_quiz:{stale_pk}:active",
-        f"group_quiz:{stale_pk}:answered",
-        f"group_quiz:{stale_pk}:skip_count",
     )
 
 

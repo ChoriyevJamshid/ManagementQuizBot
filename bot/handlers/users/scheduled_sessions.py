@@ -136,6 +136,19 @@ async def ss_cancel_session_handler(callback: types.CallbackQuery, state: FSMCon
         await callback.answer(text, show_alert=True)
         return
 
+    # If a part was actively running, stop it the same way /stop does:
+    # flip the Redis "active" flag so the loop notices within timer+2s, then
+    # close it out properly (GroupQuiz -> CANCELED, full redis cleanup,
+    # leaderboard message) instead of leaving a zombie STARTED record that
+    # only the 15-min cleanup_stale_group_quizzes sweep would eventually catch.
+    if session.active_group_quiz_id:
+        from bot.utils import redis_group
+        from bot.handlers.groups.statistics import send_statistics
+
+        await redis_group.set_quiz_inactive(str(session.active_group_quiz_id))
+        await send_statistics(session.group_id, callback.bot, is_cancelled=True)
+        await utils.clear_scheduled_session_active_quiz(session_id)
+
     from bot.utils.methods import send_text as tg_send_text
     cancel_text = await get_text('ss_cancelled_group_notify')
     tg_send_text(chat_id=int(session.group_id), text=cancel_text)

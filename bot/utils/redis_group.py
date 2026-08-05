@@ -200,45 +200,6 @@ async def set_quiz_inactive(group_quiz_id: str) -> None:
 
 
 # -----------------------------
-# NO-ANSWER DETECTION (auto-stop when nobody is answering)
-# -----------------------------
-
-async def reset_question_answered(group_quiz_id: str) -> None:
-    """Call right before/while sending a new question."""
-    key = f"group_quiz:{group_quiz_id}:answered"
-    await get_redis_client().delete(key)
-
-
-async def set_question_answered(group_quiz_id: str) -> bool:
-    """
-    Marks the current question as answered. SET NX — returns True only for
-    the first caller (i.e. the first answer received for this question).
-    """
-    key = f"group_quiz:{group_quiz_id}:answered"
-    return bool(await get_redis_client().set(key, "1", nx=True, ex=_QUIZ_TTL))
-
-
-async def is_question_answered(group_quiz_id: str) -> bool:
-    key = f"group_quiz:{group_quiz_id}:answered"
-    return await get_redis_client().exists(key) == 1
-
-
-async def increment_skips(group_quiz_id: str) -> int:
-    """Increments and returns the consecutive-no-answer counter."""
-    key = f"group_quiz:{group_quiz_id}:skip_count"
-    pipe = get_redis_client().pipeline()
-    pipe.incr(key)
-    pipe.expire(key, _QUIZ_TTL)
-    result, _ = await pipe.execute()
-    return result
-
-
-async def reset_skips(group_quiz_id: str) -> None:
-    key = f"group_quiz:{group_quiz_id}:skip_count"
-    await get_redis_client().delete(key)
-
-
-# -----------------------------
 # CLEANUP
 # -----------------------------
 
@@ -256,8 +217,6 @@ async def delete_group_quiz_data(group_quiz_id: str) -> None:
         f"group_quiz:{group_quiz_id}:current",
         f"group_quiz:{group_quiz_id}:questions",
         f"group_quiz:{group_quiz_id}:active",
-        f"group_quiz:{group_quiz_id}:answered",
-        f"group_quiz:{group_quiz_id}:skip_count",
     ]
 
     await get_redis_client().delete(*keys)

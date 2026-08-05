@@ -17,11 +17,6 @@ from .statistics import send_statistics
 
 logger = logging.getLogger(__name__)
 
-# Stop the quiz early if nobody answers this many consecutive questions
-# (e.g. everyone left the group mid-quiz) instead of blindly sending every
-# remaining question to an empty chat.
-_MAX_CONSECUTIVE_SKIPS = 3
-
 
 async def start_group_testing(group_quiz: GroupQuiz, bot: Bot) -> bool:
     """
@@ -96,22 +91,6 @@ async def run_group_quiz_loop(
 
         await asyncio.sleep(timer + 2)
 
-        if not await redis_group.is_question_answered(quiz_id):
-            skips = await redis_group.increment_skips(quiz_id)
-            if skips >= _MAX_CONSECUTIVE_SKIPS:
-                logger.info(
-                    "Quiz %s: %d consecutive questions with no answers — auto-stopping",
-                    quiz_id, skips,
-                )
-                await redis_group.set_quiz_inactive(quiz_id)
-                try:
-                    text = await get_text("group_quiz_auto_stopped_no_answers")
-                    await bot.send_message(chat_id=group_quiz.group_id, text=text)
-                except Exception:
-                    logger.exception("Quiz %s: failed to send auto-stop notice", quiz_id)
-                await send_statistics(group_quiz.group_id, bot, is_cancelled=True)
-                return False
-
     await redis_group.set_quiz_inactive(quiz_id)
     await send_statistics(group_quiz.group_id, bot)
     return True
@@ -160,8 +139,6 @@ async def send_question(
 
     quiz_id = str(group_quiz.pk)
 
-    await redis_group.reset_question_answered(quiz_id)
-
     await redis_group.set_group_question_data(
         group_quiz_id=quiz_id,
         correct_option_id=correct_option_id,
@@ -183,10 +160,6 @@ async def testing_group_poll_answer_handler(poll_answer: types.PollAnswer):
         quiz_id = await redis_group.get_redis_client().get(f"poll:{poll_answer.poll_id}")
         if not quiz_id:
             raise SkipHandler()
-
-        # First answer for this question resets the consecutive-no-answer counter.
-        if await redis_group.set_question_answered(quiz_id):
-            await redis_group.reset_skips(quiz_id)
 
         # Get question metadata
         q_data = await redis_group.get_group_question_data(quiz_id)
