@@ -217,7 +217,8 @@ class GroupQuizAdmin(ModelAdmin):
     list_per_page = 25
     readonly_fields = (
         "participant_count", "answers", "index", "skips",
-        "poll_id", "message_id", "created_at", "updated_at",
+        "poll_id", "message_id", "scheduled_session", "session_part_index",
+        "created_at", "updated_at",
     )
 
     fieldsets = (
@@ -231,7 +232,7 @@ class GroupQuizAdmin(ModelAdmin):
         }),
         ("Technical", {
             "classes": ("tab",),
-            "fields": ("poll_id", "message_id", "file", "data"),
+            "fields": ("poll_id", "message_id", "scheduled_session", "session_part_index", "file", "data"),
         }),
         ("Dates", {
             "classes": ("tab",),
@@ -271,7 +272,10 @@ class ScheduledSessionAdmin(ModelAdmin):
     search_fields = ("group_id", "group_title", "created_by__username", "created_by__first_name")
     date_hierarchy = "created_at"
     list_per_page = 25
-    readonly_fields = ("celery_task_ids", "created_at", "updated_at")
+    readonly_fields = (
+        "celery_task_ids", "current_part_index", "active_group_quiz_id",
+        "created_at", "updated_at",
+    )
 
     fieldsets = (
         ("Main", {
@@ -284,7 +288,7 @@ class ScheduledSessionAdmin(ModelAdmin):
         }),
         ("Technical", {
             "classes": ("tab",),
-            "fields": ("celery_task_ids",),
+            "fields": ("current_part_index", "active_group_quiz_id", "celery_task_ids"),
         }),
         ("Dates", {
             "classes": ("tab",),

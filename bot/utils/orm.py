@@ -365,6 +365,8 @@ async def cancel_scheduled_session(session_id: int) -> 'quiz_models.ScheduledSes
     from quiz.choices import SessionStatus
 
     def _inner():
+        import redis as _sync_redis
+        from django.conf import settings
         from celery.app.control import Control
         from src.celery_app import app as celery_app
 
@@ -378,6 +380,18 @@ async def cancel_scheduled_session(session_id: int) -> 'quiz_models.ScheduledSes
         control = Control(app=celery_app)
         for task_id in session.celery_task_ids:
             control.revoke(task_id, terminate=False)
+
+        # If a part is live right now, `revoke` alone won't stop it — the
+        # running quiz loop only watches Redis, not ScheduledSession.status.
+        # Flip the same "active" flag /stop uses so the in-progress part
+        # notices within its next iteration (<= timer+2s) instead of running
+        # to completion after the group was already told "cancelled".
+        if session.active_group_quiz_id:
+            _r = _sync_redis.from_url(settings.REDIS_URL, decode_responses=True)
+            try:
+                _r.delete(f"group_quiz:{session.active_group_quiz_id}:active")
+            finally:
+                _r.close()
 
         session.status = SessionStatus.CANCELLED
         session.save(update_fields=['status', 'updated_at'])

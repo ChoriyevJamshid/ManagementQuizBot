@@ -147,6 +147,18 @@ class GroupQuiz(BaseModel):
     status = models.CharField(max_length=31, choices=QuizStatus.choices, default=QuizStatus.INIT)
     data = models.JSONField(blank=True, null=True)
 
+    # Set only for parts launched by a ScheduledSession — lets a redelivered/retried
+    # Celery task recognize "this GroupQuiz is my own part" instead of treating it
+    # as a foreign quiz blocking the group (see quiz/tasks.py::_launch_one_part).
+    scheduled_session = models.ForeignKey(
+        "quiz.ScheduledSession",
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        related_name="group_quizzes",
+    )
+    session_part_index = models.PositiveSmallIntegerField(blank=True, null=True)
+
     objects = models.Manager()
 
     def save(self, *args, **kwargs):
@@ -171,6 +183,17 @@ class ScheduledSession(BaseModel):
         default=SessionStatus.PENDING
     )
     celery_task_ids = models.JSONField(default=list)
+
+    # Durable resume-point: index into part_ids of the part that is currently
+    # running or about to run next. Persisted *before* scheduling the next
+    # part's task, so a crashed/redelivered task can tell "already advanced
+    # past this part" apart from "still needs to run this part".
+    current_part_index = models.PositiveSmallIntegerField(default=0)
+
+    # pk of the GroupQuiz currently in flight for this session (if any), so an
+    # admin cancelling a RUNNING session can stop the live quiz immediately
+    # instead of waiting for it to finish naturally.
+    active_group_quiz_id = models.PositiveIntegerField(blank=True, null=True)
 
     objects = models.Manager()
 
